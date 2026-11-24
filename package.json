@@ -1,0 +1,13 @@
+{
+  "name": "language-learning-with-tv-shows",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "preview": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.167.0"
+  }
+}

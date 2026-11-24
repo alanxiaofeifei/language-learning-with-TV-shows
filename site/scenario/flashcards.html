@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>越南语 IT 现场排障首发：网络排查与重启</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8fafc;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #475569;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --good: #15803d;
+    --again: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 18px;
+  }
+  .topbar h1 { font-size: 19px; margin: 0; font-weight: 700; }
+  .stats { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab-btn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: #ffffff; color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .tab-btn.active {
+    background: var(--accent-soft); color: var(--accent); border-color: #bfdbfe;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 24px;
+    min-height: 320px;
+  }
+  .badge {
+    display: inline-block; font-size: 12px; font-weight: 600;
+    padding: 2px 10px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); margin-bottom: 14px;
+  }
+  .expr-front { font-size: 30px; font-weight: 700; margin-bottom: 10px; color: var(--accent); }
+  .sentence { font-size: 22px; font-weight: 500; margin-bottom: 18px; }
+  .sentence b { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
+  .audio-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  button {
+    cursor: pointer; border: 1px solid var(--border); background: #ffffff;
+    color: var(--text); border-radius: 8px; padding: 9px 14px;
+    font-size: 14px; font-weight: 600; transition: background 0.15s;
+  }
+  button:hover { background: #f1f5f9; }
+  .btn-primary { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-good { background: var(--good); color: #ffffff; border-color: var(--good); }
+  .btn-good:hover { background: #166534; }
+  .btn-again { background: var(--again); color: #ffffff; border-color: var(--again); }
+  .btn-again:hover { background: #991b1b; }
+  .back {
+    margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border);
+    display: none;
+  }
+  .back.show { display: block; }
+  .field { margin-bottom: 12px; font-size: 15px; }
+  .label { font-weight: 700; color: var(--muted); margin-right: 6px; }
+  .pron {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #ffffff; border: 1px solid var(--border);
+    padding: 3px 8px; border-radius: 6px; font-size: 14px; display: inline-block;
+  }
+  .anchor {
+    background: #ffffff; border-left: 3px solid var(--accent);
+    padding: 10px 12px; border-radius: 6px; margin: 12px 0; font-size: 15px;
+  }
+  .actions { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+  .hints { margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .done { text-align: center; padding: 48px 20px; }
+  .dlg-item {
+    background: #ffffff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .dlg-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .dlg-speaker { font-size: 13px; font-weight: 700; color: var(--accent); }
+  .dlg-target { font-size: 18px; font-weight: 600; margin: 4px 0; }
+  .dlg-zh { font-size: 14px; color: var(--muted); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1 id="pack-title"></h1>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-cards" onclick="switchView('cards')">刷卡预热</button>
+    <button class="tab-btn" id="tab-dialogue" onclick="switchView('dialogue')">完整场景对话</button>
+  </div>
+  <div id="view-cards">
+    <div id="stage"></div>
+    <div class="hints">快捷键：<code>Space</code> 翻面 ｜ <code>E</code> 听词块 ｜ <code>R</code> 听原句 ｜ <code>1</code> 不熟重练 ｜ <code>2</code> 已识别</div>
+  </div>
+  <div id="view-dialogue" class="hidden"></div>
+</div>
+
+<script>
+const PACK = {"title": "越南语 IT 现场排障首发：网络排查与重启", "slug": "vi-it-starter", "lang": "vi", "level": "L0", "mode": "scenario", "tags": ["vietnamese", "workplace-it", "L0"], "dialogue": [{"speaker": "Alan (IT)", "target": "Anh ơi, máy tính của anh không vào được mạng phải không?", "zh": "哥，您的电脑连不上网是吗？", "audio": "audio/dlg_01.mp3"}, {"speaker": "Colleague", "target": "Đúng rồi, từ sáng đến giờ không kết nối được Wi-Fi công ty.", "zh": "对的，从早上到现在都连不上公司 Wi-Fi。", "audio": "audio/dlg_02.mp3"}, {"speaker": "Alan (IT)", "target": "Anh thử khởi động lại máy tính giúp em nhé.", "zh": "您帮我试着重启一下电脑哈。", "audio": "audio/dlg_03.mp3"}, {"speaker": "Colleague", "target": "Anh khởi động lại rồi, nhưng vẫn báo lỗi mật khẩu.", "zh": "我已经重启过了，但还是报密码错误。", "audio": "audio/dlg_04.mp3"}, {"speaker": "Alan (IT)", "target": "Để em kiểm tra lại tài khoản của anh ngay bây giờ.", "zh": "让我现在马上再检查一下您的账号。", "audio": "audio/dlg_05.mp3"}, {"speaker": "Alan (IT)", "target": "Xong rồi anh ạ, anh kết nối lại thử xem nhé.", "zh": "弄好了哥，您再重新连接试一下吧。", "audio": "audio/dlg_06.mp3"}], "cards": [{"expression": "máy tính", "pronunciation": "máy (sắc 高升 35) · tính (sắc 高升 35)", "meaning_zh": "电脑 / 计算机", "source_sentence": "Anh ơi, <b>máy tính<\/b> của anh không vào được mạng phải không?", "source_sentence_plain": "Anh ơi, máy tính của anh không vào được mạng phải không?", "source_zh": "哥，您的电脑连不上网是吗？", "logic_anchor": "构词拆解：máy（机器）+ tính（汉越词“算/计算”）= 计算机。记下 máy 可以直接读懂 máy in（打印机）、máy chủ（服务器）。", "alt_example": "Máy tính của anh chạy chậm lắm.", "alt_zh": "他的电脑运行很慢。", "usage_note": "办公室最高频名词，两个音节都是 sắc 高升调，读起来干脆上扬。", "audio_expr": "audio/01_expr.mp3", "audio_sent": "audio/01_sent.mp3"}, {"expression": "không vào được mạng", "pronunciation": "không (ngang 平调 33) · vào (huyền 降调 21) · được (nặng 重短降 21?) · mạng (nặng 重短降 21?)", "meaning_zh": "上不了网 / 连不上网", "source_sentence": "Anh ơi, máy tính của anh <b>không vào được mạng<\/b> phải không?", "source_sentence_plain": "Anh ơi, máy tính của anh không vào được mạng phải không?", "source_zh": "哥，您的电脑连不上网是吗？", "logic_anchor": "结构公式：không（不）+ 动词（vào 进）+ được（能够/成）+ mạng（汉越词“网”）。这套 `không + V + được` 万能模板可套任何故障：không mở được（打不开）、không in được（打不了印）。", "alt_example": "Điện thoại em cũng không vào được mạng.", "alt_zh": "我手机也上不了网。", "usage_note": "口语比正式词 kết nối 更常见，同事报障经常直接说这句话。", "audio_expr": "audio/02_expr.mp3", "audio_sent": "audio/02_sent.mp3"}, {"expression": "khởi động lại", "pronunciation": "khởi (hỏi 低折 313) · động (nặng 重短降 21?) · lại (nặng 重短降 21?)", "meaning_zh": "重启（电脑/设备/软件）", "source_sentence": "Anh thử <b>khởi động lại<\/b> máy tính giúp em nhé.", "source_sentence_plain": "Anh thử khởi động lại máy tính giúp em nhé.", "source_zh": "您帮我试着重启一下电脑哈。", "logic_anchor": "汉越词直通：khởi（起）+ động（动）+ lại（再/回）= 重新启动。`giúp em nhé`（帮我一下哈）放在句尾可让 IT 指令听起来礼貌不生硬。", "alt_example": "Chị khởi động lại phần mềm giúp em nhé.", "alt_zh": "姐，您帮我重启一下这个软件哈。", "usage_note": "IT 排障第一神句，配合 Anh/Chị 称呼几乎覆盖 80% 现场沟通。", "audio_expr": "audio/03_expr.mp3", "audio_sent": "audio/03_sent.mp3"}, {"expression": "báo lỗi", "pronunciation": "báo (sắc 高升 35) · lỗi (ngã 断升 3?5)", "meaning_zh": "报错 / 提示错误", "source_sentence": "Anh khởi động lại rồi, nhưng vẫn <b>báo lỗi<\/b> mật khẩu.", "source_sentence_plain": "Anh khởi động lại rồi, nhưng vẫn báo lỗi mật khẩu.", "source_zh": "我已经重启过了，但还是报密码错误。", "logic_anchor": "汉越词：báo（报/报告）+ lỗi（错误/故障）。注意 `lỗi` 是 ngã 波浪调，北方音中间有明显喉咙轻顿再拉高。", "alt_example": "Hệ thống đang báo lỗi, anh chụp màn hình giúp em nhé.", "alt_zh": "系统正在报错，哥您帮我截个图哈。", "usage_note": "lỗi 单独使用就是“故障/Bug”（ví dụ: lỗi mạng 网络故障）。", "audio_expr": "audio/04_expr.mp3", "audio_sent": "audio/04_sent.mp3"}, {"expression": "mật khẩu", "pronunciation": "mật (nặng 重短降 21?) · khẩu (hỏi 低折 313)", "meaning_zh": "密码", "source_sentence": "Anh khởi động lại rồi, nhưng vẫn báo lỗi <b>mật khẩu<\/b>.", "source_sentence_plain": "Anh khởi động lại rồi, nhưng vẫn báo lỗi mật khẩu.", "source_zh": "我已经重启过了，但还是报密码错误。", "logic_anchor": "汉越词直通：mật（密）+ khẩu（口）= 密口/口令/密码。记住 `kh` 发重一点的汉语 `h` 音，读起来跟粤语/古汉语“密口”高度接近。", "alt_example": "Anh nhập lại mật khẩu giúp em nhé.", "alt_zh": "哥您帮我重新输入一下密码哈。", "usage_note": "在公司里常与 tài khoản（账号，汉越词“财款”）成对出现。", "audio_expr": "audio/05_expr.mp3", "audio_sent": "audio/05_sent.mp3"}, {"expression": "kiểm tra lại", "pronunciation": "kiểm (hỏi 低折 313) · tra (ngang 平调 33) · lại (nặng 重短降 21?)", "meaning_zh": "再检查一下 / 复查", "source_sentence": "Để em <b>kiểm tra lại<\/b> tài khoản của anh ngay bây giờ.", "source_sentence_plain": "Để em kiểm tra lại tài khoản của anh ngay bây giờ.", "source_zh": "让我现在马上再检查一下您的账号。", "logic_anchor": "汉越词直通：kiểm（检）+ tra（查）+ lại（再/重新）。`Để em ...`（让我来……）是职场主动接手问题的最佳起手式。", "alt_example": "Để em kiểm tra lại dây mạng nhé.", "alt_zh": "让我再检查一下网线哈。", "usage_note": "北方口音里 `tra` 偏接近不送气的 `ja/zha` 音。", "audio_expr": "audio/06_expr.mp3", "audio_sent": "audio/06_sent.mp3"}]};
+const IS_L0 = true;
+document.getElementById("pack-title").textContent = PACK.title || "Language Priming";
+
+let activeView = "cards";
+let queue = (PACK.cards || []).map((c, i) => ({ ...c, _id: i + 1 }));
+let mastered = 0;
+let flipped = false;
+let currentAudio = null;
+
+function playAudio(src) {
+  if (!src) return;
+  if (currentAudio) { currentAudio.pause(); }
+  currentAudio = new Audio(src);
+  currentAudio.play().catch(() => {});
+}
+
+function switchView(view) {
+  activeView = view;
+  document.getElementById("tab-cards").classList.toggle("active", view === "cards");
+  document.getElementById("tab-dialogue").classList.toggle("active", view === "dialogue");
+  document.getElementById("view-cards").classList.toggle("hidden", view !== "cards");
+  document.getElementById("view-dialogue").classList.toggle("hidden", view !== "dialogue");
+  if (view === "dialogue") renderDialogue();
+}
+
+function renderDialogue() {
+  const box = document.getElementById("view-dialogue");
+  const list = PACK.dialogue || [];
+  if (!list.length) {
+    box.innerHTML = `<div class="card"><p>当前语料包不包含场景对话（属于文章或字幕提取模式）。</p></div>`;
+    return;
+  }
+  box.innerHTML = list.map((t, i) => `
+    <div class="dlg-item">
+      <div class="dlg-top">
+        <span class="dlg-speaker">#${i + 1} · ${t.speaker || "Speaker"}</span>
+        ${t.audio ? `<button onclick="playAudio('${t.audio}')">🔊 播放</button>` : ""}
+      </div>
+      <div class="dlg-target">${t.target || ""}</div>
+      <div class="dlg-zh">${t.zh || ""}</div>
+    </div>
+  `).join("");
+}
+
+function render() {
+  const total = (PACK.cards || []).length;
+  document.getElementById("stats").textContent = `已识别 ${mastered} / ${total}（队列剩余 ${queue.length}）`;
+  const stage = document.getElementById("stage");
+
+  if (queue.length === 0) {
+    stage.innerHTML = `
+      <div class="card done">
+        <h2>本轮前置预热已完成</h2>
+        <p>所有 ${total} 个核心表达已完成识别，现在可以直接切换到“完整场景对话”盲听检验，或进入实战。</p>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:16px;">
+          <button class="btn-primary" onclick="restart()">再来一轮巩固</button>
+          <button onclick="switchView('dialogue')">去听完整对话</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const c = queue[0];
+  flipped = false;
+
+  stage.innerHTML = `
+    <div class="card">
+      <div class="badge">${(PACK.lang || "").toUpperCase()} · #${c._id}</div>
+      ${IS_L0 ? `<div class="expr-front">${c.expression}</div>` : ""}
+      <div class="sentence">${c.source_sentence || c.source_sentence_plain}</div>
+      <div class="audio-row">
+        ${c.audio_expr ? `<button onclick="playAudio('${c.audio_expr}')">🔊 听词块 (E)</button>` : ""}
+        ${c.audio_sent ? `<button onclick="playAudio('${c.audio_sent}')">🔊 听原句 (R)</button>` : ""}
+        <button class="btn-primary" id="flip-btn" onclick="flipCard()">查看解析 (Space)</button>
+      </div>
+
+      <div class="back" id="back-panel">
+        <div class="field"><span class="label">核心表达：</span><strong>${c.expression}</strong> — ${c.meaning_zh}</div>
+        ${c.pronunciation ? `<div class="field"><span class="label">拼读/声调：</span><span class="pron">${c.pronunciation}</span></div>` : ""}
+        ${c.source_zh ? `<div class="field"><span class="label">原句释义：</span>${c.source_zh}</div>` : ""}
+        ${c.logic_anchor ? `<div class="anchor"><span class="label">底层逻辑锚点：</span>${c.logic_anchor}</div>` : ""}
+        ${c.alt_example ? `<div class="field"><span class="label">迁移例句：</span>${c.alt_example}<br/><span style="color:var(--muted)">${c.alt_zh || ""}</span></div>` : ""}
+        ${c.usage_note ? `<div class="field"><span class="label">实战提示：</span>${c.usage_note}</div>` : ""}
+        <div class="actions">
+          <button class="btn-again" onclick="grade(false)">不熟，3张后重练 (1)</button>
+          <button class="btn-good" onclick="grade(true)">已识别，过 (2)</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function flipCard() {
+  if (queue.length === 0) return;
+  flipped = true;
+  document.getElementById("back-panel").classList.add("show");
+  const btn = document.getElementById("flip-btn");
+  if (btn) btn.style.display = "none";
+}
+
+function grade(known) {
+  if (queue.length === 0) return;
+  const card = queue.shift();
+  if (known) {
+    mastered += 1;
+  } else {
+    const insertAt = Math.min(3, queue.length);
+    queue.splice(insertAt, 0, card);
+  }
+  render();
+}
+
+function restart() {
+  queue = (PACK.cards || []).map((c, i) => ({ ...c, _id: i + 1 }));
+  mastered = 0;
+  render();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (activeView !== "cards" || queue.length === 0) return;
+  const c = queue[0];
+  if (e.code === "Space") { e.preventDefault(); if (!flipped) flipCard(); }
+  else if (e.key.toLowerCase() === "e" && c.audio_expr) { playAudio(c.audio_expr); }
+  else if (e.key.toLowerCase() === "r" && c.audio_sent) { playAudio(c.audio_sent); }
+  else if (e.key === "1" && flipped) { grade(false); }
+  else if (e.key === "2" && flipped) { grade(true); }
+});
+
+if (!PACK.dialogue || PACK.dialogue.length === 0) {
+  document.getElementById("tab-dialogue").classList.add("hidden");
+}
+render();
+</script>
+</body>
+</html>
