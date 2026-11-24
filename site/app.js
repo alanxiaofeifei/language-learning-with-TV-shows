@@ -99,7 +99,7 @@ function renderCourse(current) {
   const progress = el("progress");
   progress.max = episodes.length;
   progress.value = finished;
-  progress.setAttribute("aria-label", "五集学习进度");
+  progress.setAttribute("aria-label", "影视学习进度");
   const list = el("ol", "episode-list");
   for (const episode of episodes) {
     const saved = progressFor(episode);
@@ -171,9 +171,10 @@ function audioButton(lesson, card, index, status) {
       return;
     }
     const synth = window.speechSynthesis;
-    const voice = synth?.getVoices().find(item => item.lang.toLowerCase().split("-")[0] === lesson.language.split("-")[0]);
+    const voice = synth?.getVoices().find(item => item.localService
+      && item.lang.toLowerCase().split("-")[0] === lesson.language.split("-")[0]);
     if (!voice) {
-      status.textContent = "设备未提供该语言的浏览器语音。";
+      status.textContent = "设备未提供该语言的本地语音。";
       return;
     }
     const utterance = new SpeechSynthesisUtterance(card.vi);
@@ -320,6 +321,17 @@ function renderTranscript(lesson) {
   return section;
 }
 
+function renderListenCue(lesson) {
+  const cue = lesson.listen;
+  const phrase = el("strong", "", cue.vi);
+  phrase.lang = "vi";
+  const meanings = append(el("p"), phrase, " · " + cue.zh + " · ", Object.assign(el("span", "", cue.en), { lang: "en" }));
+  const seek = link("跳到 " + timestamp(cue.startSeconds) + " 回听", watchLink(lesson, cue.startSeconds), "button", true);
+  const body = append(el("div", "row row-spread"), meanings, seek);
+  return append(el("section", "panel"), el("h2", "", "原剧听辨"), body,
+    el("p", "muted", "已在原片自动字幕中核对。链接从这段字幕的起点播放。"));
+}
+
 function renderLesson(lesson, phase = nextPhase(lesson), focus = false) {
   stopAudio();
   if (run?.id !== lesson.id || run.phase !== phase) {
@@ -345,6 +357,7 @@ function renderLesson(lesson, phase = nextPhase(lesson), focus = false) {
   main.replaceChildren(header, stages, panel);
   if (storageNotice) main.append(el("p", "form-error", storageNotice));
   if (lesson.imported) main.append(renderTranscript(lesson));
+  else if (lesson.listen) main.append(renderListenCue(lesson));
   if (focus) panel.querySelector("h2").focus();
 }
 
