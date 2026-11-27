@@ -1,455 +1,591 @@
-import { episodes } from "./episodes.js";
-import { parseSubtitles } from "./import-subtitles.js";
+import { WEEKS, buildDays, nextDay } from "./lib/curriculum.js";
+import { LESSONS } from "./lib/pron.js";
+import { review, queue, today } from "./lib/srs.js";
+import {
+  LANGUAGES, SHOWS, TRACKS, languageById, showsForLanguage,
+  href, matchRoute, isComingLanguage,
+} from "./lib/catalog.js";
+import {
+  LONG_STAGES, LONG_TOTAL_WEEKS, WEEK_MODES,
+  buildLongWeeks, stageById, nextWeek,
+} from "./lib/long-curriculum.js";
+import { initMotion, motionOn, splitChars, swapMain, paintMain } from "./lib/motion.js";
 
-const storageKey = "language-studio-v1";
-const main = document.querySelector("main");
-const course = document.querySelector("#course");
-const announcement = document.querySelector("#status-announcement");
-const playlist = "https://www.youtube.com/playlist?list=PL3m_2IMNSXxcd1Ff3_Czw8je8BvHUpK6C";
-const transcriptHelp = "https://support.google.com/youtube/answer/15930243?hl=zh-Hans";
-const phases = { preview: "预习", watch: "看剧", review: "复习" };
-const languages = { "vi-VN": "越南语", "en-US": "英语", "fr-FR": "法语", "ja-JP": "日语", "es-ES": "西班牙语", other: "其他语言" };
-let state = { progress: {}, imported: [] };
-let storageNotice = "";
-let activeAudio;
-let run;
+const KEY = "vndc:v1";
+const KEY_LONG = "vndc:long:v1";
+const CATS = { food: "吃饭", shopping: "购物", work: "工作", survival: "出行求助", social: "寒暄礼貌", feeling: "情绪回应" };
+const DAYS = buildDays();
+const LONG_WEEKS = buildLongWeeks();
+const main = document.getElementById("main-content");
+const navEl = document.getElementById("site-nav");
+const brandEl = document.getElementById("site-brand");
 
-try {
-  const saved = JSON.parse(localStorage.getItem(storageKey));
-  if (saved?.progress && Array.isArray(saved.imported)) state = saved;
-} catch {
-  storageNotice = "无法读取浏览器中的学习记录。";
+let data = null, dataError = null, searchIndex = null, ctx = { lang: "vi", show: "ve-nha-di-con", track: "short" };
+const partCache = {};
+
+const state = load();
+const longState = loadLong();
+function load() {
+  try { return { doneDays: [], watched: {}, srs: {}, newToday: { day: 0, n: 0 }, newLimit: 15, track: "short", ...JSON.parse(localStorage.getItem(KEY) || "{}") }; }
+  catch { return { doneDays: [], watched: {}, srs: {}, newToday: { day: 0, n: 0 }, newLimit: 15, track: "short" }; }
+}
+function loadLong() {
+  try { return { doneWeeks: [], ...JSON.parse(localStorage.getItem(KEY_LONG) || "{}") }; }
+  catch { return { doneWeeks: [] }; }
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+function saveLong() { localStorage.setItem(KEY_LONG, JSON.stringify(longState)); }
+
+function h(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (k === "class") n.className = v;
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) n.append(k.nodeType ? k : String(k));
+  return n;
+}
+const fmt = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const yt = (videoId, ms) => `https://www.youtube.com/watch?v=${videoId}&t=${Math.max(0, Math.floor(ms / 1000) - 2)}s`;
+const go = (parts) => href({ lang: ctx.lang, show: ctx.show, track: ctx.track, ...parts });
+function titleEl(text, className = "hero-title") {
+  const el = h("h1", { class: className }, text);
+  if (motionOn()) splitChars(el, text);
+  return el;
+}
+function weekChipLabel(w) {
+  const mode = { deep: "", review: " 复习", rewatch: " 回看", cycle: " 循环" }[w.mode] || "";
+  const parts = w.parts.length ? " P" + w.parts.join("+P") : "";
+  return `W${w.week}${parts}${mode}`;
 }
 
-function save() {
+function dataBase() { return SHOWS[ctx.show]?.dataBase || "/private/data"; }
+async function loadData() {
+  if (data || dataError) return data;
   try {
-    localStorage.setItem(storageKey, JSON.stringify(state));
-    storageNotice = "";
-    return true;
-  } catch {
-    storageNotice = "浏览器存储空间不足或已被禁用。本次学习进度可能无法在刷新后保留。";
-    announcement.textContent = storageNotice;
-    return false;
+    const r = await fetch(`${dataBase()}/index.json`, { credentials: "same-origin", redirect: "manual" });
+    if (r.type === "opaqueredirect" || r.status === 0 || r.status === 401 || r.status === 403) throw new Error("login");
+    if (!r.ok) throw new Error("http " + r.status);
+    data = await r.json();
+  } catch (e) { dataError = e.message === "login" ? "login" : "error"; }
+  return data;
+}
+async function loadPart(n) {
+  if (!partCache[n]) {
+    partCache[n] = fetch(`${dataBase()}/P${String(n).padStart(2, "0")}.json`, { credentials: "same-origin" })
+      .then((r) => { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .catch((err) => { delete partCache[n]; throw err; });
   }
+  return partCache[n];
+}
+function loginCard() {
+  return h("section", { class: "panel login reveal" },
+    h("h2", {}, dataError === "login" ? "需要登录" : "数据暂时打不开"),
+    h("p", {}, "台词、双语字幕和原声片段只给你本人看（Cloudflare Access，Google 登录）。"),
+    h("a", { class: "btn primary", href: "/private/login.html" }, "用 Google 登录"));
 }
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
+let currentAudio = null;
+function speak(text) {
+  const synth = window.speechSynthesis; if (!synth) return false;
+  const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith("vi"));
+  if (!voice) return false;
+  synth.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = voice; u.lang = voice.lang; u.rate = 0.8; synth.speak(u); return true;
 }
-
-function append(parent, ...children) {
-  parent.append(...children);
-  return parent;
-}
-
-function button(text, action, primary = false, className = "button") {
-  const node = el("button", primary ? className + " primary" : className, text);
-  node.type = "button";
-  node.addEventListener("click", action);
-  return node;
-}
-
-function link(text, href, className, external = false) {
-  const node = el("a", className, text);
-  node.href = href;
-  if (external) {
-    node.target = "_blank";
-    node.rel = "noopener noreferrer";
+function playButton(p, label = "▶ 原声") {
+  if (p.clip) {
+    return h("button", { class: "btn play", type: "button", onclick: (e) => {
+      e.stopPropagation();
+      currentAudio?.pause(); currentAudio = new Audio(p.clip);
+      const slow = e.shiftKey || e.currentTarget.dataset.slow === "1"; currentAudio.playbackRate = slow ? 0.75 : 1;
+      currentAudio.play();
+    } }, label);
   }
-  return node;
+  return h("button", { class: "btn play tts", type: "button", title: "没有核实过的原声片段，使用设备的越南语合成音",
+    onclick: (e) => { e.stopPropagation(); if (!speak(p.phrase)) alert("这台设备没有越南语语音。可以点「YouTube」听原声。"); } }, "▶ 合成音");
+}
+function slowButton(p) {
+  if (!p.clip) return null;
+  return h("button", { class: "btn ghost", type: "button", onclick: (e) => {
+    e.stopPropagation(); currentAudio?.pause(); currentAudio = new Audio(p.clip); currentAudio.playbackRate = 0.7; currentAudio.play();
+  } }, "慢放");
 }
 
-function progressFor(lesson) {
-  return state.progress[lesson.id] ??= { preview: [], review: [], watched: false };
+function setFlipped(card, front, back, flipped) {
+  card.classList.toggle("is-flipped", flipped);
+  front.inert = flipped;
+  back.inert = !flipped;
+  (flipped ? back : front).querySelector("button, a")?.focus();
+}
+function phraseCard(p, video) {
+  const front = h("div", { class: "face front" },
+    h("div", { class: "card-top" }, h("span", { class: "tag " + p.category }, CATS[p.category] || p.category), p.level === 1 ? h("span", { class: "tag lv1" }, "第一周必会") : null),
+    h("p", { class: "vi" }, p.phrase),
+    h("p", { class: "reading", title: "拼音读法：辅音按汉语拼音读；箭头是声调" }, p.reading),
+    h("div", { class: "actions" }, playButton(p), slowButton(p),
+      h("button", { class: "btn primary", type: "button", onclick: (e) => { e.stopPropagation(); setFlipped(card, front, back, true); } }, "显示意思")),
+    h("p", { class: "flip-hint" }, "先听、先猜，再翻面看中文。"));
+  const back = h("div", { class: "face back" },
+    h("p", { class: "zh" }, p.zh, p.en ? h("span", { class: "en" }, " · " + p.en) : null),
+    p.usage ? h("p", { class: "usage" }, p.usage) : null,
+    h("details", { onclick: (e) => e.stopPropagation() }, h("summary", {}, "原句与声调"),
+      h("p", { class: "line" }, p.lineVi), h("p", { class: "line zh" }, p.lineZh), h("p", { class: "tones" }, p.tones)),
+    h("div", { class: "actions" }, playButton(p),
+      h("a", { class: "btn ghost", href: p.youtube || yt(video, p.startMs), target: "_blank", rel: "noopener", onclick: (e) => e.stopPropagation() }, `YouTube ${fmt(p.startMs)}`),
+      h("button", { class: "btn", type: "button", onclick: (e) => { e.stopPropagation(); setFlipped(card, front, back, false); } }, "收回")));
+  const card = h("article", { class: "flip" }, h("div", { class: "flip-inner" }, front, back));
+  back.inert = true;
+  return card;
 }
 
-function remaining(lesson, phase) {
-  const done = progressFor(lesson)[phase];
-  return lesson.cards.map((_, index) => index).filter(index => !done.includes(index));
+function progressBar(done, total) {
+  const bar = h("div", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(total), "aria-valuenow": String(done) },
+    h("span"));
+  requestAnimationFrame(() => { bar.firstChild.style.width = `${Math.round((done / total) * 100)}%`; });
+  return bar;
 }
 
-function complete(lesson) {
-  return progressFor(lesson).watched && !remaining(lesson, "preview").length && !remaining(lesson, "review").length;
+function trackSwitch(route) {
+  const show = SHOWS[route.show || ctx.show];
+  const current = route.track || state.track || show?.tracks?.[0] || "short";
+  const base = { lang: route.lang || ctx.lang, show: route.show || ctx.show };
+  return h("span", { class: "tracks", "aria-label": "学习轨道" },
+    (show?.tracks || ["short", "long"]).map((id) => h("a", {
+      href: href({ page: "track", ...base, track: id }),
+      "aria-current": current === id ? "true" : null,
+    }, TRACKS[id].nameZh)));
 }
 
-function nextPhase(lesson) {
-  if (remaining(lesson, "preview").length) return "preview";
-  return progressFor(lesson).watched ? "review" : "watch";
-}
-
-function timestamp(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = String(Math.floor(seconds % 60)).padStart(2, "0");
-  return mins + ":" + secs;
-}
-
-function watchLink(lesson, start) {
-  if (!lesson.videoId) return lesson.url;
-  const url = new URL("https://www.youtube.com/watch");
-  url.searchParams.set("v", lesson.videoId);
-  if (start != null) url.searchParams.set("t", Math.floor(start) + "s");
-  return url.href;
-}
-
-function renderCourse(current) {
-  const finished = episodes.filter(complete).length;
-  const progress = el("progress");
-  progress.max = episodes.length;
-  progress.value = finished;
-  progress.setAttribute("aria-label", "影视学习进度");
-  const list = el("ol", "episode-list");
-  for (const episode of episodes) {
-    const saved = progressFor(episode);
-    const phaseCount = Number(!remaining(episode, "preview").length) + Number(saved.watched)
-      + Number(!remaining(episode, "review").length);
-    const item = link("", "#drama/" + episode.id, "episode-link");
-    if (episode.id === current) item.setAttribute("aria-current", "page");
-    const labels = append(el("span"), el("strong", "", episode.zh),
-      el("small", "", timestamp(episode.duration) + " · " + (phaseCount === 3 ? "已完成" : phaseCount + "/3 步")));
-    append(item, el("span", "number", String(episode.number).padStart(2, "0")), labels);
-    list.append(append(el("li"), item));
+function renderShell(route) {
+  const onShow = route.page !== "notfound" && route.show && SHOWS[route.show];
+  const lang = languageById(route.lang) || (onShow && languageById(SHOWS[route.show].language));
+  if (onShow) {
+    ctx = { lang: route.lang, show: route.show, track: route.track || state.track || "short" };
+    if (route.track) { state.track = route.track; save(); }
   }
-  course.replaceChildren(el("h2", "", "5S Online"), el("p", "muted", "第一季 · 已完成 " + finished + " / " + episodes.length + " 集"), progress, list);
-  if (state.imported.length) {
-    const imports = el("ul", "local-list");
-    for (const lesson of state.imported) {
-      const item = link(lesson.title, "#local/" + lesson.id, "");
-      if (lesson.id === current) item.setAttribute("aria-current", "page");
-      imports.append(append(el("li"), item));
+  brandEl.setAttribute("href", onShow ? href({ page: "show", lang: ctx.lang, show: ctx.show }) : "#/");
+  brandEl.replaceChildren(
+    h("span", { class: "brand-mark", "aria-hidden": "true" }, onShow ? (SHOWS[ctx.show].mark || "剧") : "剧"),
+    onShow
+      ? h("span", {}, lang.nameZh, h("small", {}, lang.variant))
+      : h("span", {}, "看剧学语言", h("small", {}, "用原声学口语")),
+  );
+
+  const links = [h("a", { href: "#/", "data-nav": "home" }, "语言")];
+  if (onShow) {
+    const base = { lang: ctx.lang, show: ctx.show };
+    const track = ctx.track;
+    links.push(
+      h("a", { href: href({ page: "show", ...base }), "data-nav": "show" }, "这部剧"),
+      trackSwitch(route),
+      h("a", { href: href({ page: "track", ...base, track }), "data-nav": "today" }, track === "long" ? "本周" : "今天"),
+      h("a", { href: href({ page: "plan", ...base, track }), "data-nav": "plan" }, "课程"),
+      h("a", { href: href({ page: "parts", ...base }), "data-nav": "parts" }, "剧集"),
+      h("a", { href: href({ page: "review", ...base }), "data-nav": "review" }, "复习"),
+      h("a", { href: href({ page: "scenes", ...base }), "data-nav": "scenes" }, "场景"),
+      h("a", { href: href({ page: "search", ...base }), "data-nav": "search" }, "搜索"),
+      h("a", { href: href({ page: "vlc", ...base }), "data-nav": "vlc" }, "VLC"),
+    );
+  } else if (route.page !== "notfound" && route.lang) {
+    links.push(h("a", { href: href({ page: "lang", lang: route.lang }), "data-nav": "lang" }, languageById(route.lang)?.nameZh || "语种"));
+  }
+  navEl.replaceChildren(...links);
+  const navKey = { home: "home", lang: "lang", show: "show", track: "today", day: "today", week: "today", plan: "plan", stage: "plan", part: "parts", parts: "parts", review: "review", scenes: "scenes", search: "search", vlc: "vlc", lesson: "today" }[route.page];
+  navEl.querySelectorAll(":scope > a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.nav === navKey));
+  if (route.page === "home") document.title = "看剧学语言";
+  else if (route.page === "lang" && lang) document.title = `${lang.nameZh} · 看剧学语言`;
+  else if (onShow) document.title = `${SHOWS[route.show].titleZh} · ${lang.nameZh}`;
+}
+
+function viewHome() {
+  return [
+    h("section", { class: "hero reveal" },
+      h("p", { class: "eyebrow" }, "Language school · by TV"),
+      titleEl("看剧学语言"),
+      h("p", { class: "lede" }, "先选一种语言。越南语（北越）已经用《回家吧，孩子》开课：有 12 周短期版，也有按五年在越南生活来排的长期精读。其他语种先占位，等你选好剧再填内容。")),
+    h("div", { class: "lang-grid" }, LANGUAGES.map((lang) =>
+      h("a", { class: "lang-card reveal " + lang.status, href: href({ page: "lang", lang: lang.id }), "data-tilt": "1" },
+        h("span", { class: "pill " + (lang.status === "ready" ? "on" : "wait") }, lang.status === "ready" ? "已开放" : "即将推出"),
+        h("div", { class: "native" }, lang.nameNative),
+        h("div", { class: "name" }, lang.nameZh),
+        h("div", { class: "variant" }, lang.variant, lang.status === "coming" ? " · 剧集待选" : ""),
+      ))),
+  ];
+}
+
+function viewLang(langId) {
+  const lang = languageById(langId);
+  if (!lang) return viewNotFound();
+  if (isComingLanguage(langId)) {
+    return [h("section", { class: "panel placeholder reveal" },
+      h("p", { class: "eyebrow" }, lang.variant),
+      titleEl(`${lang.nameZh} · ${lang.nameNative}`),
+      h("p", { class: "lede" }, "即将推出 / 剧集待选。内容还没有做，等你选好剧再放进来。结构和路线已经留好，加一部剧就可以开课。"),
+      h("div", { class: "actions" }, h("a", { class: "btn primary", href: "#/" }, "回语言首页")))];
+  }
+  const shows = showsForLanguage(langId);
+  return [
+    h("section", { class: "hero reveal" },
+      h("p", { class: "eyebrow" }, lang.variant),
+      titleEl(lang.nameZh),
+      h("p", { class: "lede" }, "目前开放的教材是《Về nhà đi con》（回家吧，孩子）。同一部剧有两条轨道：12 周短期版，和按五年生活排的长期版。")),
+    h("div", { class: "track-grid" }, shows.map((show) =>
+      h("a", { class: "track-card reveal", href: href({ page: "show", lang: langId, show: show.id }), "data-tilt": "1" },
+        h("p", { class: "length" }, `${show.parts} 段 · 两条轨道`),
+        h("h2", {}, show.titleZh),
+        h("p", {}, show.titleNative),
+        h("p", { class: "muted" }, "点进去选择短期或长期。")))),
+  ];
+}
+
+function viewShow() {
+  const show = SHOWS[ctx.show];
+  const shortDone = state.doneDays.length;
+  const longDone = longState.doneWeeks.length;
+  return [
+    h("section", { class: "hero reveal" },
+      h("p", { class: "eyebrow" }, "VTV1 / VFC · 2019"),
+      titleEl(`《${show.titleNative}》`),
+      h("p", { class: "lede" }, `${show.titleZh}。先选一条轨道：短期版 12 周过完全剧；长期版用同一 82 段做五年精读，从生存句走到工厂职场和接近母语的听力。`)),
+    h("div", { class: "track-grid" },
+      h("a", { class: "track-card reveal", href: go({ page: "track", track: "short" }), "data-tilt": "1" },
+        h("p", { class: "length" }, TRACKS.short.lengthZh),
+        h("h2", {}, TRACKS.short.nameZh),
+        h("p", {}, TRACKS.short.blurb),
+        progressBar(shortDone, 84),
+        h("p", { class: "muted" }, `已完成 ${shortDone} / 84 天`)),
+      h("a", { class: "track-card long reveal", href: go({ page: "track", track: "long" }), "data-tilt": "1" },
+        h("p", { class: "length" }, TRACKS.long.lengthZh),
+        h("h2", {}, TRACKS.long.nameZh),
+        h("p", {}, TRACKS.long.blurb),
+        progressBar(longDone, LONG_TOTAL_WEEKS),
+        h("p", { class: "muted" }, `已完成 ${longDone} / ${LONG_TOTAL_WEEKS} 周`))),
+  ];
+}
+
+async function viewShortHome() {
+  const d = nextDay(DAYS, state.doneDays);
+  const wk = WEEKS[d.week - 1];
+  await loadData();
+  const due = dueCount();
+  return [
+    h("section", { class: "hero reveal" },
+      h("p", { class: "eyebrow" }, `短期版 · 第 ${d.week} 周 · 第 ${d.day} 天 / 84`),
+      titleEl("今天的课"),
+      h("p", { class: "lede" }, "用原剧原声学北越口语：先学当天的日常用语，再用 VLC 配双语字幕看一段，最后复习。"),
+      h("div", { class: "actions" },
+        h("a", { class: "btn primary", href: go({ page: "day", day: d.day }) }, "开始今天的课"),
+        h("a", { class: "btn", href: go({ page: "review" }) }, `复习${data ? `（到期 ${due}）` : ""}`))),
+    h("section", { class: "panel reveal" }, h("h2", {}, `本周：${wk.title}`), h("p", {}, wk.focus),
+      progressBar(state.doneDays.length, 84),
+      h("p", { class: "muted" }, `已完成 ${state.doneDays.length} / 84 天 · 已学卡片 ${Object.keys(state.srs).length}`)),
+    data ? null : loginCard(),
+  ];
+}
+
+async function viewDay(n) {
+  const d = DAYS[n - 1]; if (!d) return [h("p", {}, "没有这一天。")];
+  const done = state.doneDays.includes(d.day);
+  const out = [h("p", { class: "eyebrow reveal" }, `短期版 · 第 ${d.week} 周 · ${WEEKS[d.week - 1].title}`), h("h1", { class: "reveal" }, `第 ${d.day} 天`)];
+  if (d.pron) {
+    out.push(...lessonView(d.pron));
+    await loadData();
+    if (data) out.push(...corpusExamples(LESSONS[d.pron].practice));
+  }
+  if (d.reviewOnly) out.push(h("section", { class: "panel reveal" }, h("p", {}, "今天只复习：把到期卡片做完，再回看第 1 段里最难的 5 句。"), h("a", { class: "btn primary", href: go({ page: "review" }) }, "去复习")));
+  if (d.parts.length) {
+    await loadData();
+    if (!data) out.push(loginCard());
+    else for (const pn of d.parts) out.push(...(await partBlock(pn, true)));
+  }
+  out.push(h("div", { class: "actions reveal" }, h("button", { class: "btn primary", type: "button", onclick: () => {
+    if (!done) state.doneDays.push(d.day); else state.doneDays = state.doneDays.filter((x) => x !== d.day);
+    save(); route({ transition: false, preserveScroll: true });
+  } }, done ? "✓ 已完成（点击取消）" : "完成今天"), d.day < 84 ? h("a", { class: "btn", href: go({ page: "day", day: d.day + 1 }) }, "下一天 →") : null));
+  return out;
+}
+
+function lessonView(key) {
+  const L = LESSONS[key];
+  if (!L) return [h("p", {}, "没有这一课。")];
+  return [h("section", { class: "panel reveal" }, h("h2", {}, L.title), h("p", {}, L.intro),
+    h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, L.rows.map((r) => h("tr", {}, r.map((c, i) => h(i ? "td" : "th", {}, c))))))),
+    h("h3", {}, "跟读练习"),
+    h("div", { class: "chips" }, L.practice.map((t) => h("button", { class: "chip", type: "button", onclick: () => { if (!speak(t)) alert("这台设备没有越南语语音，先看拼音读法练。"); } }, t))),
+    h("p", { class: "muted" }, "练习按钮用设备自带的越南语合成音（如有）。从第 6 天起全部用原剧原声。"))];
+}
+
+function corpusExamples(practice) {
+  const norm = (t) => t.toLowerCase().normalize("NFC");
+  const words = new Set(practice.flatMap((t) => norm(t).split(/\s+/)).filter((w) => w.length > 1));
+  const picks = data.phrases.filter((p) => p.clip && p.level === 1 && norm(p.phrase).split(/\s+/).some((w) => words.has(w.replace(/[.,!?]/g, ""))));
+  if (!picks.length) return [];
+  return [h("h3", { class: "section-title" }, "原剧里的真实发音"), h("div", { class: "cards" }, picks.slice(0, 9).map((p) => phraseCard(p, data.parts.find((m) => m.part === p.part).videoId)))];
+}
+
+async function partBlock(n, compact = false) {
+  const meta = data.parts.find((p) => p.part === n); if (!meta) return [];
+  const phrases = data.phrases.filter((p) => p.part === n);
+  const watched = !!state.watched[n];
+  return [h("section", { class: "panel reveal" },
+    h("h2", {}, `P${String(n).padStart(2, "0")} · ${meta.titleZh || meta.title}`),
+    h("p", { class: "muted" }, meta.title, ` · ${Math.round(meta.duration / 60)} 分钟 · ${meta.lines} 句台词${meta.source === "whisper" ? " · 字幕由 Whisper 识别" : ""}`),
+    h("div", { class: "actions" },
+      h("a", { class: "btn primary", href: `https://www.youtube.com/watch?v=${meta.videoId}`, target: "_blank", rel: "noopener" }, "在 YouTube 看"),
+      h("a", { class: "btn", href: meta.srt, download: meta.srt.split("/").pop() }, "下载双语字幕 .srt"),
+      h("a", { class: "btn ghost", href: go({ page: "vlc" }) }, "VLC 怎么用"),
+      compact ? h("a", { class: "btn ghost", href: go({ page: "part", part: n }) }, "全文台词") : null,
+      h("button", { class: "btn ghost", type: "button", onclick: () => { state.watched[n] = !watched; save(); route({ transition: false, preserveScroll: true }); } }, watched ? "✓ 已看" : "标记已看")),
+    h("h3", { class: "section-title" }, `今日用语 ${phrases.length} 条`),
+    h("div", { class: "cards" }, phrases.map((p) => phraseCard(p, meta.videoId))))];
+}
+
+async function viewPart(n) {
+  await loadData(); if (!data) return [loginCard()];
+  const meta = data.parts.find((p) => p.part === n);
+  if (!meta) return [h("p", {}, "没有这一段。"), h("a", { class: "btn", href: go({ page: "parts" }) }, "全部剧集")];
+  const out = await partBlock(n);
+  const part = await loadPart(n);
+  out.push(h("section", { class: "panel reveal" }, h("h2", {}, "双语全文"), h("p", { class: "muted" }, "点时间跳到 YouTube 对应位置。自动识别 + 机器翻译，未人工校对。"),
+    h("ol", { class: "transcript" }, part.lines.map((L) => h("li", {},
+      h("a", { href: yt(meta.videoId, L.startMs), target: "_blank", rel: "noopener", class: "ts" }, fmt(L.startMs)),
+      h("span", { class: "vi" }, L.vi), h("span", { class: "zh" }, L.zh))))));
+  return out;
+}
+
+async function viewParts() {
+  await loadData(); if (!data) return [h("h1", {}, "全部 82 段"), loginCard()];
+  return [h("h1", { class: "reveal" }, "全部 82 段"), h("p", { class: "muted reveal" }, "来源：VFC Official YouTube 播放列表（按剧情顺序）。字幕时间轴只对这个版本有效。"),
+    h("ol", { class: "part-list reveal" }, data.parts.map((m) => h("li", {},
+      h("a", { href: go({ page: "part", part: m.part }) }, h("b", {}, `P${String(m.part).padStart(2, "0")}`), " ", m.titleZh || m.title),
+      h("span", { class: "muted" }, ` ${Math.round(m.duration / 60)} 分`), state.watched[m.part] ? h("span", { class: "tag lv1" }, "已看") : null,
+      h("a", { class: "mini", href: `https://www.youtube.com/watch?v=${m.videoId}`, target: "_blank", rel: "noopener" }, "YouTube"),
+      h("a", { class: "mini", href: m.srt, download: m.srt.split("/").pop() }, "SRT"))))];
+}
+
+function unlockedParts() {
+  if (ctx.track === "long") {
+    const cur = nextWeek(LONG_WEEKS, longState.doneWeeks);
+    return new Set(LONG_WEEKS.filter((w) => longState.doneWeeks.includes(w.week) || w.week === cur.week).flatMap((w) => w.parts));
+  }
+  return new Set(DAYS.filter((d) => state.doneDays.includes(d.day) || d.day === nextDay(DAYS, state.doneDays).day).flatMap((d) => d.parts));
+}
+function reviewPhraseIds() {
+  if (!data) return [];
+  const unlocked = unlockedParts();
+  return data.phrases.filter((p) => state.srs[p.id] || unlocked.has(p.part)).sort((a, b) => a.level - b.level || a.part - b.part).map((p) => p.id);
+}
+function dueCount() {
+  return data ? queue(reviewPhraseIds(), state.srs).due.length : 0;
+}
+
+async function viewReview() {
+  await loadData(); if (!data) return [h("h1", {}, "复习"), loginCard()];
+  const day = today();
+  if (state.newToday.day !== day) state.newToday = { day, n: 0 };
+  const ids = reviewPhraseIds();
+  const q = queue(ids, state.srs, { day, newLimit: state.newLimit, newSeenToday: state.newToday.n });
+  const id = q.due[0] || q.fresh[0];
+  const wrap = [h("h1", { class: "reveal" }, "复习"), h("p", { class: "muted reveal" }, `到期 ${q.due.length} · 今天还可学新卡 ${q.fresh.length} · 新卡上限 `,
+    h("select", { onchange: (e) => { state.newLimit = +e.target.value; save(); route({ transition: false, preserveScroll: true }); } }, [5, 10, 15, 20, 30].map((v) => h("option", { value: v, selected: v === state.newLimit }, v))), " 张/天")];
+  if (!id) return [...wrap, h("section", { class: "panel reveal" }, h("p", {}, "今天的复习做完了。新卡来自已完成和当前的课程。"), h("a", { class: "btn", href: go({ page: "track", track: ctx.track }) }, "回轨道首页"))];
+  const p = data.phrases.find((x) => x.id === id);
+  const isNew = !state.srs[id];
+  const back = h("div", { class: "back", hidden: true },
+    h("p", { class: "vi" }, p.phrase), h("p", { class: "reading" }, p.reading), h("p", { class: "zh" }, p.zh),
+    h("p", { class: "line" }, p.lineVi), h("p", { class: "line zh" }, p.lineZh),
+    h("div", { class: "actions grades" }, [["again", "忘了"], ["hard", "难"], ["good", "会"], ["easy", "简单"]].map(([g, t]) =>
+      h("button", { class: "btn grade " + g, type: "button", onclick: () => {
+        state.srs[id] = review(state.srs[id], g, day); if (isNew) state.newToday.n += 1; save(); route({ transition: false });
+      } }, t))));
+  const front = h("section", { class: "panel flash reveal" },
+    h("p", { class: "eyebrow" }, isNew ? "新卡" : "复习", " · ", CATS[p.category] || ""),
+    p.clip ? h("p", {}, "先听原声，想想是什么意思：") : h("p", { class: "vi" }, p.phrase),
+    h("div", { class: "actions" }, playButton(p), h("button", { class: "btn primary", type: "button", onclick: (e) => { back.hidden = false; e.currentTarget.remove(); } }, "看答案")),
+    back);
+  if (p.clip) setTimeout(() => front.querySelector(".play")?.click(), 50);
+  return [...wrap, front];
+}
+
+function viewPlan() {
+  return [h("h1", { class: "reveal" }, "12 周短期课程"), h("p", { class: "reveal" }, "每天约 45 分钟：日常用语（10 分钟）→ VLC 双语字幕看一段（30 分钟）→ 复习（5–10 分钟）。第 8 周起第二遍关字幕。"),
+    ...WEEKS.map((w) => h("section", { class: "panel week reveal" }, h("h2", {}, `第 ${w.week} 周 · ${w.title}`), h("p", {}, w.focus),
+      h("div", { class: "chips" }, DAYS.filter((d) => d.week === w.week).map((d) => h("a", { class: "chip" + (state.doneDays.includes(d.day) ? " done" : ""), href: go({ page: "day", day: d.day }) },
+        `D${d.day}${d.pron ? " 发音" : d.reviewOnly ? " 复习" : " P" + d.parts.join("+P")}`)))))];
+}
+
+async function viewLongHome() {
+  const w = nextWeek(LONG_WEEKS, longState.doneWeeks);
+  const stage = stageById(w.stage);
+  const done = longState.doneWeeks.length;
+  await loadData();
+  return [
+    h("section", { class: "hero reveal" },
+      h("p", { class: "eyebrow" }, `长期版 · ${stage.yearHint} · 第 ${w.week} / ${LONG_TOTAL_WEEKS} 周`),
+      titleEl(stage.title),
+      h("p", { class: "lede" }, stage.goal),
+      h("div", { class: "actions" },
+        h("a", { class: "btn primary", href: go({ page: "week", week: w.week }) }, "开始本周"),
+        h("a", { class: "btn", href: go({ page: "plan", track: "long" }) }, "五年总表"),
+        h("a", { class: "btn", href: go({ page: "review" }) }, `复习${data ? `（到期 ${dueCount()}）` : ""}`))),
+    h("section", { class: "panel reveal" },
+      h("h2", {}, `本阶段：${stage.title}`),
+      h("p", {}, stage.grammar),
+      h("p", { class: "muted" }, "技能：" + stage.skills.join(" · ")),
+      progressBar(done, LONG_TOTAL_WEEKS),
+      h("p", { class: "muted" }, `已完成 ${done} / ${LONG_TOTAL_WEEKS} 周`)),
+    data ? null : loginCard(),
+  ];
+}
+
+function viewLongPlan() {
+  return [
+    h("h1", { class: "reveal" }, "五年长期课程"),
+    h("p", { class: "reveal" }, "同一 82 段、同一批用语。前四年按阶段精读并回看，第五年循环保持。职场阶段配自编工厂 IT 补充包（不是剧中台词）。"),
+    progressBar(longState.doneWeeks.length, LONG_TOTAL_WEEKS),
+    h("div", { class: "stage-list" }, LONG_STAGES.map((s) => {
+      const weeks = LONG_WEEKS.filter((w) => w.stage === s.id);
+      const done = weeks.filter((w) => longState.doneWeeks.includes(w.week)).length;
+      return h("section", { class: "panel stage-card reveal" },
+        h("p", { class: "eyebrow" }, `${s.yearHint} · ${s.months} 个月 · P${String(s.partStart).padStart(2, "0")}–P${String(s.partEnd).padStart(2, "0")}${s.rewatchBefore ? "，并回看 P01–P" + String(s.rewatchBefore).padStart(2, "0") : s.cycle ? "，全剧循环" : ""}`),
+        h("h2", {}, h("a", { href: go({ page: "stage", stage: s.id }) }, s.title)),
+        h("p", {}, s.goal),
+        h("p", { class: "muted" }, s.grammar),
+        progressBar(done, s.weekCount),
+        h("div", { class: "chips" }, weeks.map((w) => h("a", {
+          class: "chip" + (longState.doneWeeks.includes(w.week) ? " done" : ""),
+          href: go({ page: "week", week: w.week }),
+        }, weekChipLabel(w)))));
+    })),
+  ];
+}
+
+function viewLongStage(id) {
+  const s = stageById(id);
+  if (!s) return [h("p", {}, "没有这一阶段。"), h("a", { href: go({ page: "plan", track: "long" }) }, "回总表")];
+  const weeks = LONG_WEEKS.filter((w) => w.stage === s.id);
+  const done = weeks.filter((w) => longState.doneWeeks.includes(w.week)).length;
+  return [
+    h("p", { class: "eyebrow reveal" }, `${s.yearHint} · ${s.months} 个月`),
+    h("h1", { class: "reveal" }, s.title),
+    h("p", { class: "lede reveal" }, s.goal),
+    h("section", { class: "panel reveal" }, h("h2", {}, "这一阶段练什么"), h("p", {}, s.grammar), h("p", { class: "muted" }, s.skills.join(" · ")), progressBar(done, s.weekCount)),
+    h("div", { class: "chips reveal" }, weeks.map((w) => h("a", {
+      class: "chip" + (longState.doneWeeks.includes(w.week) ? " done" : ""),
+      href: go({ page: "week", week: w.week }),
+    }, weekChipLabel(w)))),
+  ];
+}
+
+async function viewLongWeek(n) {
+  const w = LONG_WEEKS[n - 1];
+  if (!w) return [h("p", {}, "没有这一周。")];
+  const stage = stageById(w.stage);
+  const done = longState.doneWeeks.includes(w.week);
+  const out = [
+    h("p", { class: "eyebrow reveal" }, `长期版 · ${stage.title} · ${stage.yearHint}`),
+    h("h1", { class: "reveal" }, `第 ${w.week} 周`),
+    h("section", { class: "panel reveal" }, h("h2", {}, WEEK_MODES[w.mode].slice(0, 2) + "周"), h("p", {}, WEEK_MODES[w.mode]), h("p", { class: "muted" }, stage.grammar)),
+  ];
+  if (w.topic) {
+    out.push(h("section", { class: "panel work-pack reveal" },
+      h("p", { class: "eyebrow" }, "自编职场补充包 · 非剧中台词（Chilisin 工厂 IT）"),
+      h("h2", {}, w.topic.title),
+      h("p", { class: "vi" }, w.topic.vi),
+      w.topic.reading ? h("p", { class: "reading" }, w.topic.reading) : null,
+      h("p", { class: "zh" }, w.topic.zh),
+      h("p", { class: "muted" }, w.topic.note),
+      h("div", { class: "actions" }, h("button", { class: "btn play tts", type: "button", onclick: () => { if (!speak(w.topic.vi)) alert("这台设备没有越南语语音，可按拼音读法练。"); } }, "▶ 合成音"))));
+  }
+  if (w.parts.length) {
+    await loadData();
+    if (!data) out.push(loginCard());
+    else for (const pn of w.parts) out.push(...(await partBlock(pn, true)));
+  }
+  out.push(h("div", { class: "actions reveal" }, h("button", { class: "btn primary", type: "button", onclick: () => {
+    if (!done) longState.doneWeeks.push(w.week); else longState.doneWeeks = longState.doneWeeks.filter((x) => x !== w.week);
+    saveLong(); route({ transition: false, preserveScroll: true });
+  } }, done ? "✓ 本周已完成（点击取消）" : "完成本周"),
+    h("a", { class: "btn", href: go({ page: "review" }) }, "去复习"),
+    w.week < LONG_TOTAL_WEEKS ? h("a", { class: "btn", href: go({ page: "week", week: w.week + 1 }) }, "下一周 →") : null));
+  return out;
+}
+
+async function viewScenes(cat) {
+  await loadData(); if (!data) return [h("h1", {}, "按场景"), loginCard()];
+  cat = cat || "food";
+  const list = data.phrases.filter((p) => p.category === cat).sort((a, b) => a.level - b.level || a.part - b.part);
+  return [h("h1", { class: "reveal" }, "按场景学"), h("div", { class: "chips reveal" }, Object.entries(CATS).map(([k, v]) => h("a", { class: "chip" + (k === cat ? " done" : ""), href: go({ page: "scenes", cat: k }) }, `${v} ${data.phrases.filter((p) => p.category === k).length}`))),
+    h("div", { class: "cards" }, list.slice(0, 120).map((p) => phraseCard(p, data.parts.find((m) => m.part === p.part).videoId))),
+    list.length > 120 ? h("p", { class: "muted" }, `只显示前 120 条（共 ${list.length}）。`) : null];
+}
+
+async function viewSearch(qs) {
+  await loadData(); if (!data) return [h("h1", {}, "全剧搜索"), loginCard()];
+  const input = h("input", { type: "search", placeholder: "输入越南语（可不带声调）或中文，例如 bao nhiêu / 多少钱", value: qs || "" });
+  const results = h("ol", { class: "transcript" });
+  const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
+  const run = async () => {
+    const q = input.value.trim(); results.replaceChildren(); if (q.length < 2) return;
+    if (!searchIndex) searchIndex = await fetch(`${dataBase()}/search.json`, { credentials: "same-origin" }).then((r) => r.json());
+    const nq = norm(q); let n = 0;
+    for (const [part, ms, vi, zh] of searchIndex) {
+      if (!(norm(vi).includes(nq) || zh.includes(q))) continue;
+      const m = data.parts.find((x) => x.part === part);
+      results.append(h("li", {}, h("a", { class: "ts", href: yt(m.videoId, ms), target: "_blank", rel: "noopener" }, `P${part} ${fmt(ms)}`), h("span", { class: "vi" }, vi), h("span", { class: "zh" }, zh)));
+      if (++n >= 200) break;
     }
-    append(course, el("h3", "local-label", "我导入的台词"), imports);
-  }
-}
-
-function hero(kicker, title, subtitle, language) {
-  const heading = el("h1", "", title);
-  if (language) heading.lang = language;
-  return append(el("section", "hero"), el("p", "eyebrow", kicker), heading, el("p", "subtitle", subtitle));
-}
-
-function renderScene() {
-  const frame = el("iframe", "scenario-frame");
-  frame.src = "./scenario/flashcards.html";
-  frame.title = "越南语 IT 现场排障场景刷卡";
-  const panel = append(el("section", "panel scenario-panel"), frame);
-  const head = hero("默认场景 · 越南语", "IT 现场排障", "从电脑连不上网到重新连接。打开词块和原句音频，练习 6 个现场表达。");
-  append(head, append(el("div", "row actions"), link("开始《5S Online》", "#drama", "button")));
-  main.replaceChildren(head, panel);
-}
-
-function parseTone(word) {
-  const marks = {
-    "\u0300": "huyền · 低降",
-    "\u0301": "sắc · 高升",
-    "\u0309": "hỏi · 低折",
-    "\u0303": "ngã · 断升",
-    "\u0323": "nặng · 重短",
+    if (!n) results.append(h("li", {}, "没找到。"));
   };
-  return Array.from(word.normalize("NFD")).map(letter => marks[letter]).find(Boolean) ?? "ngang · 平";
+  input.addEventListener("change", run);
+  if (qs) setTimeout(run, 0);
+  return [h("h1", { class: "reveal" }, "全剧搜索"), h("p", { class: "muted reveal" }, "在 82 段台词里找一个词出现在哪些场景，点时间去 YouTube 听原声。"), input, results];
 }
 
-function stopAudio() {
-  activeAudio?.pause();
-  window.speechSynthesis?.cancel();
+async function viewVlc() {
+  const md = await fetch("./vlc.html").then((r) => r.text());
+  const box = h("section", { class: "panel prose reveal" }); box.innerHTML = md; return [box];
 }
 
-function audioButton(lesson, card, index, status) {
-  if (lesson.imported && lesson.language === "other") return null;
-  return button(lesson.imported ? "用浏览器听原句" : "听北越慢读", async () => {
-    stopAudio();
-    status.textContent = "";
-    if (!lesson.imported) {
-      activeAudio = new Audio("./audio/" + lesson.id + "/" + (index + 1) + ".mp3");
-      try {
-        await activeAudio.play();
-      } catch {
-        status.textContent = "这段音频暂时无法播放，请重试。";
-      }
-      return;
-    }
-    const synth = window.speechSynthesis;
-    const voice = synth?.getVoices().find(item => item.localService
-      && item.lang.toLowerCase().split("-")[0] === lesson.language.split("-")[0]);
-    if (!voice) {
-      status.textContent = "设备未提供该语言的本地语音。";
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(card.vi);
-    utterance.voice = voice;
-    utterance.lang = lesson.language;
-    utterance.rate = 0.8;
-    synth.speak(utterance);
-  });
+function viewNotFound() {
+  return [h("p", { class: "reveal" }, "页面不存在。"), h("a", { class: "btn", href: "#/" }, "回语言首页")];
 }
 
-function renderCards(lesson, phase, panel) {
-  const graded = progressFor(lesson)[phase];
-  const index = run.queue[0];
-  const heading = el("h2", "", phase === "preview" ? "听音辨认" : "回想词义");
-  heading.tabIndex = -1;
-  const count = el("p", "muted", graded.length + " / " + lesson.cards.length + " 张已完成");
-  const meter = el("progress");
-  meter.max = lesson.cards.length;
-  meter.value = graded.length;
-  meter.setAttribute("aria-label", phases[phase] + "卡片进度");
-  append(panel, append(el("div", "row row-spread"), heading, count), meter);
-  if (index == null) {
-    panel.append(el("p", "", phases[phase] + "已完成。"));
-    const following = episodes.find(episode => episode.number === lesson.number + 1);
-    const controls = el("div", "row actions");
-    if (phase === "preview") controls.append(button("去看完整一集", () => renderLesson(lesson, "watch", true), true));
-    if (phase === "review" && following) controls.append(link("开始第 " + following.number + " 集", "#drama/" + following.id, "button primary"));
-    if (phase === "review" && !progressFor(lesson).watched) controls.append(button("返回看剧", () => renderLesson(lesson, "watch", true), true));
-    controls.append(button("再练一遍", () => {
-      run = { id: lesson.id, phase, queue: lesson.cards.map((_, i) => i) };
-      renderLesson(lesson, phase, true);
-    }));
-    panel.append(controls);
-    return;
+async function render(route) {
+  switch (route.page) {
+    case "home": return viewHome();
+    case "lang": return viewLang(route.lang);
+    case "show": return viewShow();
+    case "track": return route.track === "long" ? viewLongHome() : viewShortHome();
+    case "day": return viewDay(route.day);
+    case "week": return viewLongWeek(route.week);
+    case "stage": return viewLongStage(route.stage);
+    case "plan": return route.track === "long" ? viewLongPlan() : viewPlan();
+    case "part": return viewPart(route.part);
+    case "parts": return viewParts();
+    case "review": return viewReview();
+    case "scenes": return viewScenes(route.cat);
+    case "search": return viewSearch(route.q);
+    case "vlc": return viewVlc();
+    case "lesson": return lessonView(route.lesson);
+    default: return viewNotFound();
   }
-
-  const card = lesson.cards[index];
-  const expression = el("h3", "expression", card.vi);
-  if (lesson.language !== "other") expression.lang = lesson.language ?? "vi";
-  const cardView = append(el("div", "card"), expression);
-  if (!lesson.imported || lesson.language === "vi-VN") {
-    const tones = el("div", "tones");
-    for (const word of card.vi.match(/[\p{L}\p{M}]+/gu) ?? []) {
-      const item = el("span", "tone");
-      append(item, el("span", "", word), el("small", "", parseTone(word)));
-      tones.append(item);
-    }
-    cardView.append(tones);
-  }
-  const status = el("p", "status");
-  status.setAttribute("role", "status");
-  const audio = audioButton(lesson, card, index, status);
-  const controls = el("div", "row actions");
-  if (audio) controls.append(audio);
-  if (card.startSeconds != null && lesson.videoId) {
-    controls.append(link("回听 " + timestamp(card.startSeconds), watchLink(lesson, card.startSeconds), "button", true));
-  }
-  const answer = el("div", "answer");
-  if (!lesson.imported) {
-    append(answer, el("p", "", card.zh), el("p", "", card.en), el("p", "muted", card.tip));
-    const example = el("p", "", card.example);
-    example.lang = "vi";
-    append(answer, example, el("p", "muted", card.exampleZh), el("p", "muted", card.exampleEn));
-    answer.hidden = true;
-    const reveal = button("查看英中释义", () => {
-      answer.hidden = false;
-      reveal.setAttribute("aria-expanded", "true");
-      reveal.disabled = true;
-      mark.focus();
-    });
-    reveal.setAttribute("aria-expanded", "false");
-    answer.id = "card-answer";
-    reveal.setAttribute("aria-controls", answer.id);
-    controls.append(reveal);
-  }
-  const mark = button("已认出", () => {
-    if (!graded.includes(index)) graded.push(index);
-    run.queue.shift();
-    save();
-    renderLesson(lesson, phase, true);
-  }, true);
-  const again = button("稍后再练", () => {
-    run.queue.push(run.queue.shift());
-    renderLesson(lesson, phase, true);
-  });
-  append(cardView, controls, status, answer, append(el("div", "row actions"), again, mark));
-  panel.append(cardView);
 }
 
-function renderWatch(lesson, panel) {
-  const heading = el("h2", "", "看剧");
-  heading.tabIndex = -1;
-  panel.append(heading);
-  if (lesson.videoId) {
-    const cover = el("div", "video-cover");
-    const text = el("p", "", lesson.imported ? lesson.title : "5S Online · 第 " + lesson.number + " 集");
-    const launch = button("在这里播放", () => {
-      const frame = el("iframe", "player");
-      frame.title = lesson.title;
-      frame.src = "https://www.youtube-nocookie.com/embed/" + lesson.videoId + "?autoplay=1&cc_load_policy=1&cc_lang_pref=vi";
-      frame.referrerPolicy = "strict-origin-when-cross-origin";
-      frame.allow = "autoplay; encrypted-media; picture-in-picture";
-      frame.allowFullscreen = true;
-      frame.tabIndex = 0;
-      cover.replaceWith(frame);
-      frame.focus();
-    });
-    append(cover, text, launch);
-    append(panel, append(el("div", "actions"), cover));
-  }
-  if (watchLink(lesson)) {
-    panel.append(append(el("div", "row actions"), link("打开原片与文字稿", watchLink(lesson), "button", true)));
-  }
-  if (!lesson.imported) {
-    append(panel, el("p", "muted", "五集均有越南语自动字幕。打开原片后，展开简介选择「显示文字稿」，可按时间点回听。用播放器的字幕设置切换英文或简体中文自动翻译。"),
-      append(el("p", "muted"), link("YouTube 文字稿说明", transcriptHelp, "", true), " · ", link("第一季播放列表", playlist, "", true)));
-  }
-  if (lesson.imported && !watchLink(lesson)) panel.append(el("p", "muted", "看完手头的影片后，回来标记已观看。"));
-  panel.append(append(el("div", "row actions"), button(progressFor(lesson).watched ? "已观看，去复习" : "我看完了，去复习", () => {
-    progressFor(lesson).watched = true;
-    save();
-    renderLesson(lesson, "review", true);
-  }, true)));
+let routeGen = 0;
+async function route({ transition = true, preserveScroll = false } = {}) {
+  const rec = matchRoute(location.hash || "#/");
+  renderShell(rec);
+  const gen = ++routeGen;
+  const nodes = await render(rec);
+  if (gen !== routeGen) return;
+  if (transition) await swapMain(main, nodes);
+  else paintMain(main, nodes);
+  if (!preserveScroll) window.scrollTo(0, 0);
 }
 
-function renderTranscript(lesson) {
-  const section = append(el("section", "panel"), el("h2", "", "导入的台词"));
-  const details = append(el("details"), el("summary", "", "展开全文 · " + lesson.cues.length + " 条"));
-  details.addEventListener("toggle", () => {
-    if (!details.open || details.querySelector("ol")) return;
-    const list = el("ol", "transcript");
-    for (const cue of lesson.cues) {
-      const line = el("li");
-      if (cue.startSeconds != null) {
-        line.append(lesson.videoId ? link(timestamp(cue.startSeconds), watchLink(lesson, cue.startSeconds), "", true)
-          : el("span", "timestamp muted", timestamp(cue.startSeconds)));
-      }
-      line.append(document.createTextNode(cue.text));
-      list.append(line);
-    }
-    details.append(list);
-  });
-  append(section, el("p", "muted", "本次用前 " + lesson.cards.length + " 条台词做预习与复习，全文保存在当前浏览器。"), details);
-  return section;
-}
-
-function renderListenCue(lesson) {
-  const cue = lesson.listen;
-  const phrase = el("strong", "", cue.vi);
-  phrase.lang = "vi";
-  const meanings = append(el("p"), phrase, " · " + cue.zh + " · ", Object.assign(el("span", "", cue.en), { lang: "en" }));
-  const seek = link("跳到 " + timestamp(cue.startSeconds) + " 回听", watchLink(lesson, cue.startSeconds), "button", true);
-  const body = append(el("div", "row row-spread"), meanings, seek);
-  return append(el("section", "panel"), el("h2", "", "原剧听辨"), body,
-    el("p", "muted", "已在原片自动字幕中核对。链接从这段字幕的起点播放。"));
-}
-
-function renderLesson(lesson, phase = nextPhase(lesson), focus = false) {
-  stopAudio();
-  if (run?.id !== lesson.id || run.phase !== phase) {
-    run = { id: lesson.id, phase, queue: phase === "watch" ? [] : remaining(lesson, phase) };
-  }
-  renderCourse(lesson.id);
-  const header = lesson.imported ? hero("我的台词 · " + languages[lesson.language], lesson.title, "先听读，再看原片，最后复习。")
-    : hero("5S Online · 第一季第 " + lesson.number + " 集 · " + timestamp(lesson.duration), lesson.title, lesson.zh + " · " + lesson.en, "vi");
-  if (!lesson.imported) header.append(el("p", "muted", lesson.focus + " 三语卡是原创练习。实际对白请看原片文字稿。"));
-  const stages = el("nav", "stage-nav");
-  stages.setAttribute("aria-label", "学习步骤");
-  for (const [key, label] of Object.entries(phases)) {
-    const done = key === "watch" ? progressFor(lesson).watched : !remaining(lesson, key).length;
-    const detail = done ? "已完成" : (key === "watch" ? "观看原片" : progressFor(lesson)[key].length + " / " + lesson.cards.length);
-    const step = button("", () => renderLesson(lesson, key, true), false, "step");
-    if (phase === key) step.setAttribute("aria-current", "step");
-    append(step, el("strong", "", label), el("span", "", detail));
-    stages.append(step);
-  }
-  const panel = el("section", "panel");
-  if (phase === "watch") renderWatch(lesson, panel);
-  else renderCards(lesson, phase, panel);
-  main.replaceChildren(header, stages, panel);
-  if (storageNotice) main.append(el("p", "form-error", storageNotice));
-  if (lesson.imported) main.append(renderTranscript(lesson));
-  else if (lesson.listen) main.append(renderListenCue(lesson));
-  if (focus) panel.querySelector("h2").focus();
-}
-
-function externalUrl(raw) {
-  if (!raw) return { url: "", videoId: "" };
-  const url = new URL(raw);
-  if (url.protocol !== "https:" || url.username || url.password) throw new Error("影片链接请输入完整的 HTTPS 地址。");
-  const host = url.hostname.toLowerCase();
-  let id = "";
-  if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
-  if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) id = url.searchParams.get("v") ?? "";
-  return { url: url.href, videoId: /^[A-Za-z0-9_-]{11}$/.test(id) ? id : "" };
-}
-
-function renderImport() {
-  const panel = el("section", "panel");
-  panel.innerHTML = `
-    <h2 id="import-heading">添加台词</h2>
-    <form aria-labelledby="import-heading" method="post">
-      <div class="form-grid">
-        <div class="field"><label for="title">学习标题</label><input id="title" name="title" required maxlength="100" placeholder="例如 5S Online 第 1 集"></div>
-        <div class="field"><label for="language">台词语言</label><select id="language" name="language"></select></div>
-        <div class="field wide"><label for="video">影片地址（可选）</label><input id="video" name="video" type="url" maxlength="1000" placeholder="https://…" autocomplete="off"></div>
-        <div class="field wide"><label for="file">字幕文件（可选）</label><input id="file" name="file" type="file" accept=".srt,.vtt,.txt"></div>
-        <div class="field wide"><label for="transcript-text">或粘贴台词</label><textarea id="transcript-text" name="transcript" maxlength="524288" aria-describedby="import-help"></textarea></div>
-      </div>
-      <p class="muted" id="import-help">支持 SRT、VTT、TXT 或带时间点的 YouTube 文字稿。内容和进度仅保存在这个浏览器。</p>
-      <p class="form-error" role="status" id="import-error"></p>
-      <button class="button primary" type="submit">导入并开始学习</button>
-    </form>`;
-  const form = panel.querySelector("form");
-  const selector = form.elements.language;
-  for (const [code, label] of Object.entries(languages)) selector.add(new Option(label, code));
-  const error = panel.querySelector("#import-error");
-  const submit = panel.querySelector("button");
-  form.addEventListener("submit", async event => {
-    event.preventDefault();
-    if (submit.disabled) return;
-    submit.disabled = true;
-    error.textContent = "";
-    try {
-      const title = form.elements.title.value.trim();
-      const file = form.elements.file.files[0];
-      const pasted = form.elements.transcript.value.trim();
-      if (!title) throw new Error("请输入学习标题。");
-      if (file && pasted) throw new Error("请选择文件或粘贴台词其中一种。");
-      if (file?.size > 524288) throw new Error("文件超过 512 KB，请按集缩小后再导入。");
-      const cues = parseSubtitles(file ? await file.text() : pasted, file?.name);
-      const lesson = {
-        id: crypto.randomUUID(), title, language: selector.value, imported: true,
-        ...externalUrl(form.elements.video.value.trim()), cues,
-        cards: cues.slice(0, 10).map(cue => ({ vi: cue.text, startSeconds: cue.startSeconds })),
-      };
-      state.imported.push(lesson);
-      if (!save()) state.imported.pop();
-      if (storageNotice) throw new Error("无法保存这份台词，请检查浏览器存储或导入较少文字。");
-      location.hash = "#local/" + lesson.id;
-    } catch (problem) {
-      error.textContent = problem instanceof TypeError ? "请检查影片链接或字幕文件后重试。" : problem.message;
-    } finally {
-      submit.disabled = false;
-    }
-  });
-  main.replaceChildren(hero("影视学习", "导入你正在看的剧", "放入字幕或台词，按同样的三步练习。"), panel);
-}
-
-function navigate(focus = false) {
-  stopAudio();
-  const [page, id] = location.hash.slice(1).split("/");
-  if (page === "main-content") return;
-  const section = page === "local" ? "import" : (["scene", "drama", "import"].includes(page) ? page : "scene");
-  for (const anchor of document.querySelectorAll(".top-nav a")) {
-    if (anchor.id === "nav-" + section) anchor.setAttribute("aria-current", "page");
-    else anchor.removeAttribute("aria-current");
-  }
-  run = null;
-  renderCourse();
-  const match = page === "local" ? state.imported.find(item => item.id === id)
-    : page === "drama" ? episodes.find(item => item.id === id) ?? episodes.find(item => !complete(item)) ?? episodes[0] : null;
-  if (match) {
-    if (page === "drama" && id !== match.id) history.replaceState(null, "", "#drama/" + match.id);
-    renderLesson(match);
-  }
-  else if (section === "import") renderImport();
-  else renderScene();
-  if (focus) main.focus();
-}
-
-window.addEventListener("hashchange", () => navigate(true));
-document.querySelector(".skip").addEventListener("click", event => {
-  event.preventDefault();
-  main.focus();
-  main.scrollIntoView();
-});
-navigate();
+initMotion();
+window.addEventListener("hashchange", () => route());
+route();
