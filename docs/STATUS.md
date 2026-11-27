@@ -1,6 +1,6 @@
 # STATUS
 
-Updated 2026-11-28 03:41 (Asia/Saigon, UTC+7).
+Updated 2026-11-28 05:59 (Asia/Saigon, UTC+7).
 
 ## Done
 - Phase 1 plan: `docs/PLAN-ve-nha-di-con.md`; VLC guide `docs/VLC-bilingual-subtitles.md` (also served as `/vlc.html`).
@@ -8,7 +8,7 @@ Updated 2026-11-28 03:41 (Asia/Saigon, UTC+7).
 - New site: today/day view, 12-week plan (week 1 = tones, consonants, vowels, finals, address terms), part pages with phrase cards + full bilingual transcript + SRT download, SRS review, scenes, whole-show search, VLC page. Piper TTS replaced by original clips; device `speechSynthesis` only as labelled fallback.
 - 5S Online + IT scenario archived at `/archive/5s-online/`.
 - Cloudflare Access apps for `/private` on tv.alanzhu.dev and tv-preview.alanzhu.dev (reusable policy "Quota dashboard owner via Google"; Worker JWT re-check). No Access apps were widened or deleted. Private files are Worker static assets (not R2), git-ignored, not in Git (~21 MB: 9.5 MB audio, 3.9 MB SRT, 7.8 MB data).
-- Site rebuild is on branch `plan/ve-nha-di-con` (commits `3ebe99f`, `93c394c`, docs `76958fa`). Draft PR #1 is open and unmerged. Production `tv.alanzhu.dev` was last deployed 2026-11-27 18:41 UTC+7 (pre-rebuild) and has not been updated.
+- Site rebuild is on branch `plan/ve-nha-di-con` (commits `3ebe99f`, `93c394c`, docs `76958fa`, counts `28787d5`). Draft PR #1 is open and unmerged. Production `tv.alanzhu.dev` was last deployed 2026-11-27 18:41 UTC+7 (pre-rebuild) and has not been updated.
 
 ## Numbers
 - Parts: 82 (P06 via Whisper; the other 81 from YouTube auto captions).
@@ -19,22 +19,21 @@ Updated 2026-11-28 03:41 (Asia/Saigon, UTC+7).
 
 ## Preview
 - URL: https://tv-preview.alanzhu.dev/
-- Live preview is still the 2026-11-28 02:04 UTC+7 deploy (292 clips). The 419-clip `site/private` tree is built locally and ready to upload, but the preview redeploy did **not** go out: `finalize_preview.sh` ran wrangler in a detached environment without `CLOUDFLARE_API_TOKEN`, and this executor shell also has no token after the interruption. Do not deploy production. To finish: in a shell that has the token, `cd /workspace/language-learning-with-TV-shows && CLOUDFLARE_ACCOUNT_ID=ea884be522b147922e986feade4a2cfb npx wrangler deploy --env preview`.
-- Anonymous checks (browser User-Agent, 2026-11-28 03:40 UTC+7): `/` → 200 (new site); `/private/data/index.json`, `/private/srt/VeNhaDiCon_P01_08B-aPzkLAg.srt`, and `/private/audio/P01/p01-12.mp3` → 302 to `alaninsights.cloudflareaccess.com` (preview Access AUD). Owner login was not available from this box; sample SRT and clips exist locally under `site/private/` (e.g. `private/srt/VeNhaDiCon_P01_08B-aPzkLAg.srt`, `private/audio/P01/p01-12.mp3`).
+- Preview Worker `language-learning-with-tv-shows-preview` redeployed 2026-11-28 05:59 UTC+7 with the 419-clip `site/private` tree. Current Version ID: `5421497f-9f05-42b8-bef9-e55a8bbd4976` (created 2026-11-27T22:59:05Z). Wrangler read 742 files from `site/` and uploaded 128 new or modified assets (including `/private/data/index.json` and the new pass-2 clips; 520 already uploaded). The 128-file delta matches 127 new clips (419 − 292) plus the rebuilt index. There is no public (non-Access) count manifest; clip counts are only in git-ignored `/private` data. Production was not deployed.
+- Anonymous checks (browser User-Agent, 2026-11-28 05:59 UTC+7): `/` → 200 (title 看剧学越南语 · 回家吧，孩子); `/private`, `/private/`, and `/private/data/index.json` → 302 to `alaninsights.cloudflareaccess.com` (preview Access AUD). Owner login / authenticated asset fetch was not done from this box.
 
 ## Stages
 | Stage | State |
 | --- | --- |
-| Local commit (site rebuild + docs) | done (`3ebe99f`, `93c394c`, `76958fa`) |
+| Local commit (site rebuild + docs) | done (`3ebe99f`, `93c394c`, `76958fa`, `28787d5`) |
 | Pushed to `plan/ve-nha-di-con` | done |
-| Merged | no (draft PR #1) |
-| Preview deployed | partial — 02:04 UTC+7 build (292 clips) is live; 419-clip rebuild not uploaded (missing API token) |
+| Merged | no (draft PR #1; waiting on Alan's review) |
+| Preview deployed | done — 05:59 UTC+7, version `5421497f-9f05-42b8-bef9-e55a8bbd4976`, 419-clip tree |
+| Preview verified | done — anonymous `/` 200 and `/private` 302 to Access |
 | Production deployed | no |
-| Access / public page verified | preview anonymous 200 + `/private` 302 verified; auth'd asset fetch not done (no owner session) |
 
 ## Next
-- Redeploy preview with the 419-clip `site/private` tree once `CLOUDFLARE_API_TOKEN` is available in the environment; re-verify Access; then Alan acceptance.
-- Production deploy (`npx wrangler deploy`) only when asked.
+- Alan reviews https://tv-preview.alanzhu.dev/ (log in for `/private` assets). Production deploy (`npx wrangler deploy` without `--env preview`) and merge of PR #1 only when asked.
 - Work/factory topic pack (tăng ca, nghỉ phép, hàng lỗi, ca đêm…): search corpus for originals; fallback labelled TTS.
 - Optional quality pass: merge YouTube ASR + Whisper hypotheses; proofread week-1/2 parts, especially P04, P07, P46 (no verified clips).
 - Progress is per-browser (localStorage); add export/import if Alan uses two devices.
