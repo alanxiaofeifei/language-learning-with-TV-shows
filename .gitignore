@@ -1,2 +1,6 @@
 node_modules/
 .wrangler/
+work/
+*.m4a
+*.webm
+__pycache__/
