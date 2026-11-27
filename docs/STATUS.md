@@ -1,39 +1,39 @@
 # STATUS
 
-Updated 2026-11-28 05:59 (Asia/Saigon, UTC+7).
+Updated 2026-11-28 06:28 (Asia/Saigon, UTC+7).
 
 ## Done
-- Phase 1 plan: `docs/PLAN-ve-nha-di-con.md`; VLC guide `docs/VLC-bilingual-subtitles.md` (also served as `/vlc.html`).
-- Pipeline for all 82 VFC parts: bilingual VI+ZH lines/SRT, daily phrases (food/shopping/work/survival first), rule-based tones + readings, verified original-audio clips. Clip pass-2 finished (82/82 `clips2.done`). Local `site/private` rebuilt 2026-11-28 03:38 UTC+7. `npm test`: 10/10 passed.
-- New site: today/day view, 12-week plan (week 1 = tones, consonants, vowels, finals, address terms), part pages with phrase cards + full bilingual transcript + SRT download, SRS review, scenes, whole-show search, VLC page. Piper TTS replaced by original clips; device `speechSynthesis` only as labelled fallback.
-- 5S Online + IT scenario archived at `/archive/5s-online/`.
-- Cloudflare Access apps for `/private` on tv.alanzhu.dev and tv-preview.alanzhu.dev (reusable policy "Quota dashboard owner via Google"; Worker JWT re-check). No Access apps were widened or deleted. Private files are Worker static assets (not R2), git-ignored, not in Git (~21 MB: 9.5 MB audio, 3.9 MB SRT, 7.8 MB data).
-- Site rebuild is on branch `plan/ve-nha-di-con` (commits `3ebe99f`, `93c394c`, docs `76958fa`, counts `28787d5`). Draft PR #1 is open and unmerged. Production `tv.alanzhu.dev` was last deployed 2026-11-27 18:41 UTC+7 (pre-rebuild) and has not been updated.
+- Site is now a language picker at `#/`. Vietnamese (北越) is the only ready language: 《Về nhà đi con》回家吧，孩子, with a **12-week short track** (existing 84-day plan, `vndc:v1` progress kept) and a **5-year long track** (260 weeks, 6 stages: 立足 → 日常自如 → 社交与分寸 → 职场沟通 / Chilisin 工厂 IT → 接近母语听力 → 循环保持). Same 82 parts / 28,900 lines / 1,239 phrases / 419 clips.
+- Placeholder language pages (“即将推出 / 剧集待选”) for 英语（美式）, 法语（加拿大）, 日语（东京标准音）, 西班牙语（美式/拉美）, 粤语（香港）. Catalog and hash routes in `site/lib/catalog.js` are built so a later language + show can be added without rewriting the shell. Legacy hashes (`#/plan`, `#/day/N`, …) still open the Vietnamese short track.
+- UI refresh (warm paper, display serif, language/track cards) plus interactive motion: phrase-card flip/reveal, page transitions, progress-bar animation, hover tilt, scroll progress. `prefers-reduced-motion` turns all of that off. No heavy animation libraries; MotionHarness techniques only, not a copy of motionharness.top.
+- Private assets still Worker static files behind Access (not in Git). Access apps and policies were not changed. `npm test`: 15/15 passed.
+- Independent pre-deploy review: Antigravity CLI `agy --mode plan --model gemini-4-argon-high` (no quota rotation needed). Verdict was request-changes; blockers and majors were fixed before deploy (swapMain `fill:forwards` hiding `<main>`, flip-card keyboard/`inert`, track-switcher `aria-current`, 404 `ctx` pollution, cross-track SRS due cards, reveal-delay cap, in-page rerenders without full-page transitions). Supporting long-track text was authored in-repo; DeepSeek/GLM spend this pass: **US$0**.
 
 ## Numbers
 - Parts: 82 (P06 via Whisper; the other 81 from YouTube auto captions).
 - Subtitle / transcript lines: 28,900.
 - Phrases: 1,239.
-- Verified original-audio clips: **419** (up from 292 after pass-2). Parts with no verified clip: P04, P07, P46.
-- LLM: 1,368 DeepSeek `deepseek-chat` calls, 0 GLM fallback. Tokens in `gen/usage.jsonl`: cache-hit 343,168, cache-miss 2,936,834, output 1,351,639. Estimated spend at official 2026 DeepSeek V4.1 Flash rates (legacy `deepseek-chat` alias): about **US$1.25 off-peak** / US$2.50 peak. The usage log has no per-call timestamps; generation clustered around 17:00 UTC Friday 2026-11-27, which is off-peak.
+- Verified original-audio clips: **419**. Parts with no verified clip: P04, P07, P46.
+- Short track: 12 weeks, 84 days, each part once.
+- Long track: 260 weeks; first-pass deep weeks cover P01–P82 once; year 5 cycles the whole show.
+- Earlier LLM pipeline (unchanged): 1,368 DeepSeek `deepseek-chat` calls, 0 GLM; about US$1.25 off-peak.
 
 ## Preview
 - URL: https://tv-preview.alanzhu.dev/
-- Preview Worker `language-learning-with-tv-shows-preview` redeployed 2026-11-28 05:59 UTC+7 with the 419-clip `site/private` tree. Current Version ID: `5421497f-9f05-42b8-bef9-e55a8bbd4976` (created 2026-11-27T22:59:05Z). Wrangler read 742 files from `site/` and uploaded 128 new or modified assets (including `/private/data/index.json` and the new pass-2 clips; 520 already uploaded). The 128-file delta matches 127 new clips (419 − 292) plus the rebuilt index. There is no public (non-Access) count manifest; clip counts are only in git-ignored `/private` data. Production was not deployed.
-- Anonymous checks (browser User-Agent, 2026-11-28 05:59 UTC+7): `/` → 200 (title 看剧学越南语 · 回家吧，孩子); `/private`, `/private/`, and `/private/data/index.json` → 302 to `alaninsights.cloudflareaccess.com` (preview Access AUD). Owner login / authenticated asset fetch was not done from this box.
+- Redeployed 2026-11-28 06:28 UTC+7 with the language home, two Vietnamese tracks, and motion upgrade. Worker `language-learning-with-tv-shows-preview`. Version ID: `0cea8dfa-e242-4d18-ac38-460b82d69bae`. Uploaded 6 new public files; 419 clips already on the Worker were reused.
+- Anonymous checks (browser User-Agent): `/` → 200 (title 看剧学语言, cache MISS); `/app.js`, `/lib/catalog.js`, `/lib/long-curriculum.js`, `/styles.css` → 200; `/private`, `/private/`, `/private/data/index.json` → 302 to `alaninsights.cloudflareaccess.com` (preview Access AUD).
 
 ## Stages
 | Stage | State |
 | --- | --- |
-| Local commit (site rebuild + docs) | done (`3ebe99f`, `93c394c`, `76958fa`, `28787d5`) |
-| Pushed to `plan/ve-nha-di-con` | done |
-| Merged | no (draft PR #1; waiting on Alan's review) |
-| Preview deployed | done — 05:59 UTC+7, version `5421497f-9f05-42b8-bef9-e55a8bbd4976`, 419-clip tree |
-| Preview verified | done — anonymous `/` 200 and `/private` 302 to Access |
-| Production deployed | no |
+| Local commit | pending this STATUS + feature files |
+| Pushed to `plan/ve-nha-di-con` | pending |
+| Merged | no (draft PR #1; Alan authorized merge after this work) |
+| Preview deployed | done — 06:28 UTC+7, version `0cea8dfa-e242-4d18-ac38-460b82d69bae` |
+| Preview verified | done — anonymous `/` 200 and `/private` 302 |
+| Production deployed | not yet (next, after merge) |
 
 ## Next
-- Alan reviews https://tv-preview.alanzhu.dev/ (log in for `/private` assets). Production deploy (`npx wrangler deploy` without `--env preview`) and merge of PR #1 only when asked.
-- Work/factory topic pack (tăng ca, nghỉ phép, hàng lỗi, ca đêm…): search corpus for originals; fallback labelled TTS.
-- Optional quality pass: merge YouTube ASR + Whisper hypotheses; proofread week-1/2 parts, especially P04, P07, P46 (no verified clips).
-- Progress is per-browser (localStorage); add export/import if Alan uses two devices.
+- Merge PR #1 and deploy production (`npx wrangler deploy`, default env only) with the same local `site/private` tree; verify `tv.alanzhu.dev` `/` 200 and `/private` 302 to the existing “TV study private” Access app.
+- When Alan picks shows for the other languages, add a show record in `catalog.js` and run the pipeline into that show’s private data prefix.
+- Optional quality pass on P04, P07, P46 (no verified clips); export/import of per-browser progress.

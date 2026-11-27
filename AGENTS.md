@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Learning site for Northern (Hà Nội) Vietnamese built on the VTV drama *Về nhà đi con* (回家吧，孩子). Owner: Alan (zero-base learner, Chinese native). Live: https://tv.alanzhu.dev (production), https://tv-preview.alanzhu.dev (preview).
+Multi-language learning site (hash routes, language picker at `#/`). Vietnamese (Northern / Hà Nội) is the first ready language, built on the VTV drama *Về nhà đi con* (回家吧，孩子), with a 12-week short track and a 5-year long track on the same 82 parts. Other languages (US English, Canadian French, Tokyo Japanese, US/Latin American Spanish, Hong Kong Cantonese) are placeholders until a show is chosen. Owner: Alan. Live: https://tv.alanzhu.dev (production), https://tv-preview.alanzhu.dev (preview).
 
 ## Hard rules
 - **Nothing copyrighted in Git.** Transcripts, bilingual SRTs, phrase cards with show lines and audio clips live only in `site/private/` (git-ignored) and are deployed behind Cloudflare Access. Public Git may hold code, the episode list (`data/ve-nha-di-con/parts.json`: public YouTube IDs/titles) and our own teaching content.
@@ -11,7 +11,7 @@ Learning site for Northern (Hà Nội) Vietnamese built on the VTV drama *Về n
 - Long pipeline jobs on the shared box must be started with `setsid nohup` so they survive agent interruptions. Do not restart or kill a live `cut_clips.py` / `clip_worker2.sh` / `finalize_preview.sh`.
 
 ## Layout
-- `site/` static app (vanilla ES modules, hash routes). `site/lib/srs.js` (SM-2 style SRS), `site/lib/curriculum.js` (84-day plan), `site/lib/pron.js` (week-1 lessons). `site/archive/5s-online/` = previous 5S Online + IT scenario app (frozen).
+- `site/` static app (vanilla ES modules, hash routes). `site/lib/catalog.js` (languages, shows, routes and legacy aliases), `site/lib/curriculum.js` (12-week / 84-day short plan), `site/lib/long-curriculum.js` (260-week / 6-stage long plan), `site/lib/srs.js` (SM-2 style SRS), `site/lib/pron.js` (week-1 lessons), `site/lib/motion.js` (page transitions, reduced-motion). `site/archive/5s-online/` = previous 5S Online + IT scenario app (frozen).
 - `src/worker.js` Worker: serves assets, guards `/private/*`.
 - `pipeline/` data pipeline (Python 3, ffmpeg; faster-whisper + yt-dlp in a venv):
   1. `yt-dlp --write-auto-subs --sub-langs vi-orig --sub-format json3` per part (P06 has no captions → `whisper_to_json3.py`).
@@ -22,4 +22,4 @@ Learning site for Northern (Hà Nội) Vietnamese built on the VTV drama *Về n
 - Work folder on the Grok box: `/workspace/tvshows-work/venhadicon/` (captions, audio, gen/). Helpers: `resume.sh`, `clip_worker2.sh`, `finalize_preview.sh`. Do not name work folders dist/build/out.
 
 ## Checks
-`npm test` (SRS, curriculum, Worker JWT guard, legacy subtitle parser). After a preview or production deploy: anonymous GET `/` must be 200; anonymous GET `/private/data/index.json` must redirect (302) to `alaninsights.cloudflareaccess.com`. If you cannot log in as the owner, confirm a sample SRT and clip exist under `site/private/` (the tree that wrangler uploads).
+`npm test` (catalog/routes, short and long curricula, SRS, Worker JWT guard, legacy subtitle parser). After a preview or production deploy: anonymous GET `/` must be 200; anonymous GET `/private/data/index.json` must redirect (302) to `alaninsights.cloudflareaccess.com`. If you cannot log in as the owner, confirm a sample SRT and clip exist under `site/private/` (the tree that wrangler uploads).
