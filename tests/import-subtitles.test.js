@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSubtitles } from '../site/import-subtitles.js';
+import { parseSubtitles } from '../site/archive/5s-online/import-subtitles.js';
 
 test('SRT supports BOM, CRLF, multiline cues, markup and fractional seconds', () => {
   const input = '\uFEFF1\r\n00:00:02,250 --> 00:00:05,000\r\n<i>Xin chào!</i>\r\nEm chào anh.\r\n\r\n2\r\n00:00:06,000 --> 00:00:07,000\r\n[Music]';

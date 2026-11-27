@@ -4,3 +4,4 @@ work/
 *.m4a
 *.webm
 __pycache__/
+site/private/

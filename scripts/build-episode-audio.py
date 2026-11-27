@@ -38,7 +38,7 @@ def voice_model(model_path):
 def episode_clips():
     result = subprocess.run(
         ["node", "--input-type=module", "-e",
-         'import {episodes} from "./site/episodes.js"; console.log(JSON.stringify(episodes))'],
+         'import {episodes} from "./site/archive/5s-online/episodes.js"; console.log(JSON.stringify(episodes))'],
         cwd=ROOT, check=True, capture_output=True, encoding="utf-8",
     )
     clips = {}
@@ -105,7 +105,7 @@ def build(model_path, output, force):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, help="Pinned ONNX file with its adjacent .json config")
-    parser.add_argument("--out-dir", type=Path, default=ROOT / "site" / "audio")
+    parser.add_argument("--out-dir", type=Path, default=ROOT / "site" / "archive" / "5s-online" / "audio")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     build(args.model, args.out_dir, args.force)

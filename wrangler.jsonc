@@ -1,16 +1,32 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "language-learning-with-tv-shows",
+  "main": "src/worker.js",
   "compatibility_date": "2026-11-24",
   "assets": {
-    "directory": "./site"
+    "directory": "./site",
+    "binding": "ASSETS",
+    "run_worker_first": ["/private/*"]
   },
   "workers_dev": false,
   "preview_urls": false,
-  "routes": [
-    {
-      "pattern": "tv.alanzhu.dev",
-      "custom_domain": true
+  // Production. Access app "TV study private" protects tv.alanzhu.dev/private (owner Google login only).
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "https://alaninsights.cloudflareaccess.com",
+    "ACCESS_AUD": "7ced6fd4afa7c36a8ca62b7818a54e23cd90f046e2e90d2068c17cf526e948b6"
+  },
+  "routes": [{ "pattern": "tv.alanzhu.dev", "custom_domain": true }],
+  "env": {
+    // Preview: `npx wrangler deploy --env preview`. Access app "TV study private (preview)".
+    "preview": {
+      "name": "language-learning-with-tv-shows-preview",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "ACCESS_TEAM_DOMAIN": "https://alaninsights.cloudflareaccess.com",
+        "ACCESS_AUD": "ea7514ed7acbb7c96fd553b233f34427c3149169da680e96a5cde650e579465f"
+      },
+      "routes": [{ "pattern": "tv-preview.alanzhu.dev", "custom_domain": true }]
     }
-  ]
+  }
 }

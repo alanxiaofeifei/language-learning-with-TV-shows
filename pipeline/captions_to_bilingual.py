@@ -3,7 +3,9 @@
 Usage: python pipeline/captions_to_bilingual.py CAPTIONS.vi-orig.json3 OUT_PREFIX [--model deepseek-chat]
 Needs DEEPSEEK_API_KEY in env (never logged). Writes OUT_PREFIX.lines.json and OUT_PREFIX.vi-zh.srt.
 """
-import argparse, json, os, re, sys, time, urllib.request
+import argparse, json, os, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from llm import chat_json, USED
 
 API = "https://api.deepseek.com/chat/completions"
 SYSTEM = """你是越南语（北部河内口音）影视字幕编辑兼中文译者。剧名《Về nhà đi con》（回家吧，孩子，VTV 2019）。
@@ -28,18 +30,8 @@ def words_from_json3(path):
             out.append({"t": ev["tStartMs"] + sg.get("tOffsetMs", 0), "w": w, "evEnd": ev["tStartMs"] + ev.get("dDurationMs", 0)})
     return out
 
-def call(model, prompt, retries=3):
-    body = json.dumps({"model": model, "temperature": 0.2, "response_format": {"type": "json_object"},
-                       "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]}).encode()
-    for i in range(retries):
-        try:
-            req = urllib.request.Request(API, data=body, headers={"Authorization": "Bearer " + os.environ["DEEPSEEK_API_KEY"],
-                                         "Content-Type": "application/json", "User-Agent": "tvshows-pipeline/0.1"})
-            r = json.load(urllib.request.urlopen(req, timeout=180))
-            return json.loads(r["choices"][0]["message"]["content"])["lines"]
-        except Exception as e:
-            print("retry", i, type(e).__name__, file=sys.stderr); time.sleep(3 * (i + 1))
-    raise RuntimeError("LLM failed")
+def call(model, prompt):
+    return chat_json(SYSTEM, prompt)["lines"]
 
 def ts(ms):
     ms = max(0, int(ms)); h, ms = divmod(ms, 3600000); m, ms = divmod(ms, 60000); s, ms = divmod(ms, 1000)
@@ -79,7 +71,9 @@ def main():
     with open(a.out + ".vi-zh.srt", "w", encoding="utf-8-sig", newline="\r\n") as f:
         for i, L in enumerate(lines, 1):
             f.write(f"{i}\n{ts(L['startMs'])} --> {ts(L['endMs'])}\n{L['vi']}\n{L['zh']}\n\n")
-    print(len(words), "words ->", len(lines), "lines", file=sys.stderr)
+    if not a.reuse:
+        json.dump({"providers": sorted(USED), "words": len(words), "lines": len(lines)}, open(a.out + ".meta.json", "w"))
+    print(len(words), "words ->", len(lines), "lines", sorted(USED), file=sys.stderr)
 
 if __name__ == "__main__":
     main()
