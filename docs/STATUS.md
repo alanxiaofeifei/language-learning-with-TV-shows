@@ -2,13 +2,20 @@
 
 Updated 2026-11-28 19:20 (Asia/Saigon, UTC+7).
 
+## Spanish shows (feat/es-shows, 2026-11-28) — code ready, data not built
+- Spanish (Mexican / Latin-American baseline) is a ready language in the catalog: 《Club de Cuervos》 乌鸦俱乐部 S04 (12 eps, short-track pick, `2018 · S04`) and 《La casa de las flores》 花之家 S01–S02 (13 + 9 = 22 eps, long-track pick). Text only, es + zh reader, CEFR cards, zh translations and explanations only (no Vietnamese). A Spain-Spanish show stays a planned later stage.
+- Club de Cuervos S01–S03 have no Spanish subtitles on SubDL, so only S04 is included.
+- New `pipeline/multi/fetch_subdl.py` (SubDL API; key from env `SUBDL_API_KEY` only, redacted everywhere). Spanish SRT cleanup, ñ-preserving phrase matching and zh-only prompts in `pipeline/multi/*`.
+- Operator still to do: fetch SRTs, run ingest → translate → phrases → build, `episodes_public.py` for both shows (creates `site/shows/<id>/episodes.json`), review, deploy. Linh's `visibleLangs` (zh+en) keeps the Spanish card hidden for her; no `USER_PREFS` change needed.
+- Deploy record: (operator)
+
 ## Phase 2 ship (feat/ja-fr-shows)
 Ready languages and shows (private data behind Access, not in Git):
 - Vietnamese: 《回家吧，孩子》 82 parts / 1,239 phrases / 419 clips (unchanged).
 - Chinese: 《都挺好》 46 eps / 37,184 lines / 658 phrases / 658 official-YouTube clips.
 - English (text-only): 《Friends》 S01–S02 48/691; 《Seinfeld》 S01–S02 17/236 (S01E00 has no English subtitle upstream, skipped); 《Silicon Valley》 S01 8/114; 《Desperate Housewives》 S01 22/321 (S01E16 missing upstream, skipped).
 - Japanese (text-only): 《逃げるは恥だが役に立つ》 S01 11/164 (zh translations only).
-- French (text-only, France French baseline): 《Lupin》 Part 1 5/75 (zh translations only). Spanish and Cantonese stay placeholders.
+- French (text-only, France French baseline): 《Lupin》 Part 1 5/75 (zh translations only). Spanish and Cantonese stayed placeholders in this ship (Spanish: see above).
 
 Per-user display (secret `USER_PREFS`, emails not in Git): Alan / defaults hide Vietnamese translations (`hideLangs: ["vi"]`); Linh sees Vietnamese translations on Chinese and English shows (`hideLangs: []`, visible languages zh+en, Vietnamese UI). Display only, not authorization.
 
