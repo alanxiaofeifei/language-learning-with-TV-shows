@@ -2,7 +2,8 @@
 
 Usage: python pipeline/multi/ingest_srt.py SHOW_ID WORKDIR [--only S01E01,S01E02] [--force]
 Strips HTML/ASS tags and music notes. Also strips Japanese cue labels, French bracketed cues and, for Spanish,
-[música] / (risas) cues, lyric lines and ALL-CAPS "NOMBRE:" speaker labels (¿ ¡ are kept).
+[música] / (risas) cues, sung lyrics (a cue with ♪ ♫ ♬ ♩ in any row is dropped whole; "# ... #"-wrapped rows
+are dropped, "#" inside dialogue such as "#Metoo" is kept) and ALL-CAPS "NOMBRE:" speaker labels (¿ ¡ are kept).
 Japanese transcript readings use pykakasi (install it in the pipeline Python environment).
 Writes WORKDIR/gen/SxxEyy.lines.json = [{i,start,end,<target>}] (ms). If the file exists, keeps existing
 translations (zh/vi) for lines whose source text is unchanged; skips entirely unless --force.
@@ -29,20 +30,26 @@ def read_srt(path, target="en"):
         k = next((j for j, r in enumerate(rows) if TS.search(r)), None)
         if k is None: continue
         m = TS.search(rows[k])
+        if target == "es" and any(ES_NOTES.search(strip_tags(r)) for r in rows[k + 1:]):
+            continue                        # any ♪ row: the whole cue is sung lyrics / music
         body = [clean_text(r, target) for r in rows[k + 1:]]
         body = [r for r in body if r]
         if not body: continue
         out.append({"start": ms(*m.groups()[:4]), "end": ms(*m.groups()[4:]), target: " ".join(body)})
     return out
 
-# ALL-CAPS speaker label at line start (after an optional dialogue dash): "PAULINA:", "DON SALVADOR:".
-ES_SPEAKER = re.compile(r"^((?:[-–—]\s*)?)[A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ.'’ -]*[A-ZÁÉÍÓÚÜÑ.]:(?:\s+|$)")
+ES_NOTES = re.compile(r"[♪♫♬♩]")
+
+def strip_tags(r):
+    r = re.sub(r"<[^>]+>", "", r)           # <i>, <font ...>
+    return re.sub(r"\{\\[^}]*\}", "", r)    # {\an8}
 
 def clean_text(r, target="en"):
-    r = re.sub(r"<[^>]+>", "", r)           # <i>, <font ...>
-    r = re.sub(r"\{\\[^}]*\}", "", r)       # {\an8}
-    if target == "es" and re.match(r"\s*(?:[-–—]\s*)?[♪♫]", r):
-        return ""                           # sung lyrics / music-only line
+    r = strip_tags(r)
+    if target == "es":
+        s = r.strip()
+        if ES_NOTES.search(s) or (len(s) > 1 and s.startswith("#") and s.endswith("#")):
+            return ""                       # sung lyrics: a ♪ anywhere, or a "# ... #"-wrapped row
     r = r.replace("♪", "").replace("♫", "")
     # "#" marks sung lyrics ("# Smelly cat #"), but also appears in dialogue ("We're #1!", "Apt. #20"):
     # drop it only when it wraps the whole line or stands alone between spaces.
