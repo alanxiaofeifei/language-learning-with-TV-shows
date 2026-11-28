@@ -121,6 +121,7 @@ export const SHOWS = {
     mark: "都",
     year: "2019",
     channel: "正午阳光官方频道",
+    channelVi: "Daylight Entertainment (正午阳光)",
     playlist: "PL2Vcf2jYz5dfh5rHzOEok_gDLJf39MhuO",
     dataBase: showDataBase("dou-ting-hao"),
     publicBase: "/shows/dou-ting-hao",

@@ -13,35 +13,50 @@ export function initMulti(e) { env = { ...env, ...e }; }
 const stores = {};
 function store(id) {
   if (!stores[id]) {
-    const base = { doneDays: [], watched: {}, srs: {}, newToday: { day: 0, n: 0 }, newLimit: 15, toggles: null };
+    const base = { doneDays: [], watched: {}, srs: {}, newToday: { day: 0, n: 0 }, newLimit: 15, toggles: null, track: "short" };
     try { stores[id] = { ...base, ...JSON.parse(localStorage.getItem(`tv:show:${id}:v1`) || "{}") }; }
     catch { stores[id] = base; }
   }
   return stores[id];
 }
 function persist(id) { try { localStorage.setItem(`tv:show:${id}:v1`, JSON.stringify(store(id))); } catch { /* ignore */ } }
+// Last track picked for a show (read with one argument, set with two), so nav keeps it across pages.
+export function multiTrack(id, track) {
+  const st = store(id);
+  if (track === "short" || track === "long") { if (st.track !== track) { st.track = track; persist(id); } }
+  return st.track === "long" ? "long" : "short";
+}
 
 // ---- data ----
 const cache = {};
-function c(id) { return (cache[id] ||= { pub: null, idx: null, idxErr: null, eps: {} }); }
+function c(id) { return (cache[id] ||= { pub: null, pubPromise: null, idx: null, idxErr: null, idxPromise: null, eps: {} }); }
+// Both loaders share one in-flight request. Failures are not cached (except "login" for the index),
+// so the next view retries after a transient network error.
 async function loadPublic(show) {
   const k = c(show.id);
-  if (!k.pub) {
-    try { const r = await fetch(`${show.publicBase}/episodes.json`); k.pub = r.ok ? await r.json() : { episodes: [] }; }
-    catch { k.pub = { episodes: [] }; }
-  }
-  return k.pub;
+  if (k.pub) return k.pub;
+  k.pubPromise ||= (async () => {
+    try { const r = await fetch(`${show.publicBase}/episodes.json`); if (r.ok) k.pub = await r.json(); }
+    catch { /* retry next time */ }
+    finally { k.pubPromise = null; }
+    return k.pub || { episodes: [] };
+  })();
+  return k.pubPromise;
 }
 async function loadIndex(show) {
   const k = c(show.id);
-  if (k.idx || k.idxErr) return k.idx;
-  try {
-    const r = await fetch(`${show.dataBase}/index.json`, { credentials: "same-origin", redirect: "manual" });
-    if (r.type === "opaqueredirect" || r.status === 0 || r.status === 401 || r.status === 403) throw new Error("login");
-    if (!r.ok) throw new Error("http " + r.status);
-    k.idx = await r.json();
-  } catch (e) { k.idxErr = e.message === "login" ? "login" : "error"; }
-  return k.idx;
+  if (k.idx || k.idxErr === "login") return k.idx;
+  k.idxPromise ||= (async () => {
+    try {
+      const r = await fetch(`${show.dataBase}/index.json`, { credentials: "same-origin", redirect: "manual" });
+      if (r.type === "opaqueredirect" || r.status === 0 || r.status === 401 || r.status === 403) throw new Error("login");
+      if (!r.ok) throw new Error("http " + r.status);
+      k.idx = await r.json(); k.idxErr = null;
+    } catch (e) { k.idxErr = e.message === "login" ? "login" : "error"; }
+    finally { k.idxPromise = null; }
+    return k.idx;
+  })();
+  return k.idxPromise;
 }
 async function loadEp(show, rec) {
   const k = c(show.id);
@@ -64,6 +79,7 @@ function epList(show) {
 const isYt = (show) => show.source === "youtube-official";
 const ytUrl = (id, ms = 0) => `https://www.youtube.com/watch?v=${id}` + (ms > 0 ? `&t=${Math.max(0, Math.floor(ms / 1000) - 2)}s` : "");
 const go = (show, parts) => href({ lang: show.language, show: show.id, ...parts });
+const channelName = (show) => (uiLang() === "vi" ? show.channelVi || show.channel : show.channel);
 const showTitle = (show) => (show.language === "zh" ? `《${show.titleNative}》` : show.titleNative);
 function epLabel(show, e) {
   return isYt(show) ? t("ep.title", { n: e.n }) : `${e.code}${e.title ? " · " + e.title : ""}`;
@@ -78,7 +94,7 @@ function loginCard(show) {
 function watchPanel(show) {
   if (isYt(show)) {
     return h("section", { class: "panel notice reveal" },
-      h("p", {}, t("show.officialNote", { channel: show.channel || "YouTube" })),
+      h("p", {}, t("show.officialNote", { channel: channelName(show) || "YouTube" })),
       show.playlist ? h("div", { class: "actions" },
         h("a", { class: "btn", href: `https://www.youtube.com/playlist?list=${show.playlist}`, target: "_blank", rel: "noopener" }, t("show.playlist"))) : null);
   }
@@ -92,7 +108,7 @@ function explainOf(p) {
   const L = env.prefs().explainLang === "vi" ? "vi" : "zh";
   const other = L === "vi" ? "zh" : "vi";
   return {
-    meaning: L === "vi" ? (p.meaning_vi || p.meaning_en) : (p.meaning_zh || p.meaning_en),
+    meaning: p[`meaning_${L}`] || p.meaning_en || p[`meaning_${other}`] || "",
     explain: p[`explain_${L}`] || p[`explain_${other}`] || "",
     usage: p[`usage_${L}`] || p[`usage_${other}`] || "",
   };
@@ -148,7 +164,7 @@ async function viewShow(show) {
   const next = (LONG_OUTLINES[show.language] || []).filter((s) => s.status !== "now").map((s) => s.show).join(" → ");
   return [
     h("section", { class: "hero reveal" },
-      h("p", { class: "eyebrow" }, [show.channel, show.year].filter(Boolean).join(" · ")),
+      h("p", { class: "eyebrow" }, [channelName(show), show.year].filter(Boolean).join(" · ")),
       titleEl(showTitle(show)),
       h("p", { class: "lede" }, [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · "))),
     h("div", { class: "track-grid" },
@@ -233,7 +249,7 @@ async function viewEp(show, n) {
     for (const li of list.children) li.hidden = !li.dataset.langs.split(" ").some((k) => tog[k]);
   };
   const toggles = h("div", { class: "chips lang-toggles", role: "group", "aria-label": t("ep.toggles") },
-    h("span", { class: "muted" }, t("ep.toggles") + "："),
+    h("span", { class: "muted" }, t("ep.toggles") + t("common.colon")),
     langs.map((k) => {
       const box = h("input", { type: "checkbox", checked: !!tog[k], onchange: (ev) => { tog[k] = ev.target.checked; st.toggles = { ...tog }; persist(show.id); applyToggles(); } });
       return h("label", { class: "chip toggle" }, box, " ", t("langname." + k));
@@ -354,7 +370,7 @@ async function viewReview(show) {
   const q = queue(reviewIds(show), st.srs, { day, newLimit: st.newLimit, newSeenToday: st.newToday.n });
   const id = q.due[0] || q.fresh[0];
   const wrap = [h("h1", { class: "reveal" }, t("review.title")), h("p", { class: "muted reveal" }, t("review.stats", { due: q.due.length, fresh: q.fresh.length }) + " ",
-    h("select", { onchange: (e) => { st.newLimit = +e.target.value; persist(show.id); env.rerender({ transition: false, preserveScroll: true }); } },
+    h("select", { "aria-label": t("review.newLimit"), onchange: (e) => { st.newLimit = +e.target.value; persist(show.id); env.rerender({ transition: false, preserveScroll: true }); } },
       [5, 10, 15, 20, 30].map((v) => h("option", { value: v, selected: v === st.newLimit }, v))), " " + t("review.perDay"))];
   if (!id) return [...wrap, h("section", { class: "panel reveal" }, h("p", {}, t("review.empty")), h("a", { class: "btn", href: go(show, { page: "track", track: "short" }) }, t("review.backTrack")))];
   const p = idx.phrases.find((x) => x.id === id);
@@ -372,7 +388,7 @@ async function viewReview(show) {
     h("p", { class: "eyebrow" }, (isNew ? t("review.new") : t("review.due")) + (p.level ? " · " + p.level : "")),
     p.clip ? h("p", {}, t("review.listen")) : h("p", { class: "vi" }, p.phrase),
     h("div", { class: "actions" }, ...clipButtons(p).slice(0, 1),
-      h("button", { class: "btn primary", type: "button", onclick: (ev) => { back.hidden = false; ev.currentTarget.remove(); } }, t("review.answer"))),
+      h("button", { class: "btn primary", type: "button", onclick: (ev) => { back.hidden = false; ev.currentTarget.remove(); back.querySelector(".grades button")?.focus(); } }, t("review.answer"))),
     back);
   if (p.clip) setTimeout(() => front.querySelector(".play")?.click(), 50);
   return [...wrap, front];

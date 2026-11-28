@@ -7,7 +7,7 @@ import {
 } from "./lib/catalog.js";
 import { t, setUiLang, uiLang, UI_LANGS } from "./lib/i18n.js";
 import { DEFAULT_ME, effectivePrefs, homeLanguages, fetchMe, loadLocalPrefs, saveLocalPrefs } from "./lib/prefs.js";
-import { initMulti, renderMulti } from "./multi.js";
+import { initMulti, renderMulti, multiTrack } from "./multi.js";
 import {
   LONG_STAGES, LONG_TOTAL_WEEKS, WEEK_MODES,
   buildLongWeeks, stageById, nextWeek,
@@ -24,7 +24,7 @@ const main = document.getElementById("main-content");
 const navEl = document.getElementById("site-nav");
 const brandEl = document.getElementById("site-brand");
 
-let data = null, dataError = null, searchIndex = null, ctx = { lang: "vi", show: "ve-nha-di-con", track: "short" };
+let data = null, dataError = null, dataPromise = null, searchIndex = null, ctx = { lang: "vi", show: "ve-nha-di-con", track: "short" };
 const partCache = {};
 
 const state = load();
@@ -49,15 +49,20 @@ function weekChipLabel(w) {
 }
 
 function dataBase() { return SHOWS[ctx.show]?.dataBase || "/private/data"; }
+// One request at a time; a "login" result sticks (the login page reloads the app), other errors retry on the next view.
 async function loadData() {
-  if (data || dataError) return data;
-  try {
-    const r = await fetch(`${dataBase()}/index.json`, { credentials: "same-origin", redirect: "manual" });
-    if (r.type === "opaqueredirect" || r.status === 0 || r.status === 401 || r.status === 403) throw new Error("login");
-    if (!r.ok) throw new Error("http " + r.status);
-    data = await r.json();
-  } catch (e) { dataError = e.message === "login" ? "login" : "error"; }
-  return data;
+  if (data || dataError === "login") return data;
+  dataPromise ||= (async () => {
+    try {
+      const r = await fetch(`${dataBase()}/index.json`, { credentials: "same-origin", redirect: "manual" });
+      if (r.type === "opaqueredirect" || r.status === 0 || r.status === 401 || r.status === 403) throw new Error("login");
+      if (!r.ok) throw new Error("http " + r.status);
+      data = await r.json(); dataError = null;
+    } catch (e) { dataError = e.message === "login" ? "login" : "error"; }
+    finally { dataPromise = null; }
+    return data;
+  })();
+  return dataPromise;
 }
 async function loadPart(n) {
   if (!partCache[n]) {
@@ -130,7 +135,7 @@ function phraseCard(p, video) {
 function trackSwitch(route) {
   const show = SHOWS[route.show || ctx.show];
   const multi = isMultiShow(show?.id);
-  const current = route.track || (multi ? null : state.track) || show?.tracks?.[0] || "short";
+  const current = route.track || (multi ? multiTrack(show.id) : state.track) || show?.tracks?.[0] || "short";
   const base = { lang: route.lang || ctx.lang, show: route.show || ctx.show };
   return h("span", { class: "tracks", "aria-label": t("track.label") },
     (show?.tracks || ["short", "long"]).map((id) => h("a", {
@@ -148,6 +153,11 @@ function userMenu() {
     h("div", { class: "user-menu-pop" }, sel("uiLang", prefs.uiLang, t("menu.ui")), sel("explainLang", prefs.explainLang, t("menu.explain"))));
 }
 
+// Vietnamese UI: Chinese shows use their Vietnamese title, others their native title (Friends, Về nhà đi con).
+function showTitleFor(show) {
+  if (uiLang() !== "vi") return show.titleZh || show.titleNative;
+  return show.language === "zh" ? (show.titleVi || show.titleNative) : show.titleNative;
+}
 function langName(lang) { return uiLang() === "vi" ? (lang.nameVi || lang.nameZh) : lang.nameZh; }
 function langVariant(lang) { return uiLang() === "vi" ? (lang.variantVi || lang.variant) : lang.variant; }
 
@@ -156,10 +166,15 @@ function renderShell(route) {
   const lang = languageById(route.lang) || (onShow && languageById(SHOWS[route.show].language));
   const multi = onShow && isMultiShow(route.show);
   if (onShow) {
-    ctx = { lang: route.lang, show: route.show, track: route.track || (multi ? "short" : state.track) || "short" };
+    ctx = { lang: route.lang, show: route.show, track: route.track || (multi ? multiTrack(route.show) : state.track) || "short" };
     if (route.track && !multi) { state.track = route.track; save(); }
+    if (route.track && multi) multiTrack(route.show, route.track);
   }
   document.documentElement.lang = uiLang() === "vi" ? "vi" : "zh-CN";
+  const skip = document.querySelector(".skip"); if (skip) skip.textContent = t("skip.main");
+  for (const [id, key] of [["footer-rights", "footer.rights"], ["footer-archive", "footer.archive"], ["footer-home", "footer.home"]]) {
+    const el = document.getElementById(id); if (el) el.textContent = t(key);
+  }
   navEl.setAttribute("aria-label", t("nav.label"));
   brandEl.setAttribute("href", onShow ? href({ page: "show", lang: ctx.lang, show: ctx.show }) : "#/");
   brandEl.replaceChildren(
@@ -177,7 +192,7 @@ function renderShell(route) {
       h("a", { href: href({ page: "show", ...base }), "data-nav": "show" }, t("nav.show")),
       trackSwitch(route),
       h("a", { href: href({ page: "track", ...base, track }), "data-nav": "today" }, track === "long" && !multi ? "本周" : t("nav.today")),
-      h("a", { href: href({ page: "plan", ...base, track }), "data-nav": "plan" }, t("nav.plan")),
+      multi && track === "long" ? null : h("a", { href: href({ page: "plan", ...base, track }), "data-nav": "plan" }, t("nav.plan")),
       h("a", { href: href({ page: "parts", ...base }), "data-nav": "parts" }, t("nav.episodes")),
       h("a", { href: href({ page: "review", ...base }), "data-nav": "review" }, t("nav.review")),
     );
@@ -192,12 +207,12 @@ function renderShell(route) {
     links.push(h("a", { href: href({ page: "lang", lang: route.lang }), "data-nav": "lang" }, lang ? langName(lang) : t("nav.languages")));
   }
   links.push(userMenu());
-  navEl.replaceChildren(...links);
+  navEl.replaceChildren(...links.filter(Boolean));
   const navKey = { home: "home", lang: "lang", show: "show", track: "today", day: "today", week: "today", plan: "plan", stage: "plan", part: "parts", ep: "parts", parts: "parts", review: "review", scenes: "scenes", search: "search", vlc: "vlc", lesson: "today" }[route.page];
   navEl.querySelectorAll(":scope > a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.nav === navKey));
   if (route.page === "home") document.title = t("brand.title");
   else if (route.page === "lang" && lang) document.title = `${langName(lang)} · ${t("brand.title")}`;
-  else if (onShow) document.title = `${SHOWS[route.show].titleZh} · ${langName(lang)}`;
+  else if (onShow) document.title = `${showTitleFor(SHOWS[route.show])} · ${langName(lang)}`;
 }
 
 function plannedList(lang) {
@@ -222,7 +237,7 @@ function viewHome() {
         h("div", { class: "native" }, lang.nameNative),
         h("div", { class: "name" }, langName(lang)),
         h("div", { class: "variant" }, langVariant(lang),
-          lang.status === "coming" && lang.planned?.length ? ` · ${t("lang.planned")}：${lang.planned.map((p) => uiLang() === "vi" ? (p.titleVi || p.title) : p.title).join(" / ")}` : ""),
+          lang.status === "coming" && lang.planned?.length ? ` · ${t("lang.planned")}${t("common.colon")}${lang.planned.map((p) => uiLang() === "vi" ? (p.titleVi || p.title) : p.title).join(" / ")}` : ""),
       ))),
     canToggle ? h("div", { class: "actions reveal" }, h("button", { class: "btn ghost", type: "button", onclick: () => {
       localPrefs.showAllLangs = !localPrefs.showAllLangs; saveLocalPrefs(localPrefs); applyPrefs(); route({ transition: false, preserveScroll: true });
@@ -408,7 +423,7 @@ async function viewReview() {
   const q = queue(ids, state.srs, { day, newLimit: state.newLimit, newSeenToday: state.newToday.n });
   const id = q.due[0] || q.fresh[0];
   const wrap = [h("h1", { class: "reveal" }, "复习"), h("p", { class: "muted reveal" }, `到期 ${q.due.length} · 今天还可学新卡 ${q.fresh.length} · 新卡上限 `,
-    h("select", { onchange: (e) => { state.newLimit = +e.target.value; save(); route({ transition: false, preserveScroll: true }); } }, [5, 10, 15, 20, 30].map((v) => h("option", { value: v, selected: v === state.newLimit }, v))), " 张/天")];
+    h("select", { "aria-label": t("review.newLimit"), onchange: (e) => { state.newLimit = +e.target.value; save(); route({ transition: false, preserveScroll: true }); } }, [5, 10, 15, 20, 30].map((v) => h("option", { value: v, selected: v === state.newLimit }, v))), " 张/天")];
   if (!id) return [...wrap, h("section", { class: "panel reveal" }, h("p", {}, "今天的复习做完了。新卡来自已完成和当前的课程。"), h("a", { class: "btn", href: go({ page: "track", track: ctx.track }) }, "回轨道首页"))];
   const p = data.phrases.find((x) => x.id === id);
   const isNew = !state.srs[id];
@@ -422,7 +437,7 @@ async function viewReview() {
   const front = h("section", { class: "panel flash reveal" },
     h("p", { class: "eyebrow" }, isNew ? "新卡" : "复习", " · ", CATS[p.category] || ""),
     p.clip ? h("p", {}, "先听原声，想想是什么意思：") : h("p", { class: "vi" }, p.phrase),
-    h("div", { class: "actions" }, playButton(p), h("button", { class: "btn primary", type: "button", onclick: (e) => { back.hidden = false; e.currentTarget.remove(); } }, "看答案")),
+    h("div", { class: "actions" }, playButton(p), h("button", { class: "btn primary", type: "button", onclick: (e) => { back.hidden = false; e.currentTarget.remove(); back.querySelector(".grades button")?.focus(); } }, "看答案")),
     back);
   if (p.clip) setTimeout(() => front.querySelector(".play")?.click(), 50);
   return [...wrap, front];
@@ -584,6 +599,7 @@ async function render(route) {
     case "stage": return viewLongStage(route.stage);
     case "plan": return route.track === "long" ? viewLongPlan() : viewPlan();
     case "part": return viewPart(route.part);
+    case "ep": return viewPart(route.ep);
     case "parts": return viewParts();
     case "review": return viewReview();
     case "scenes": return viewScenes(route.cat);

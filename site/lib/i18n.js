@@ -115,6 +115,12 @@ export const DICT = {
     "grade.good": "会",
     "grade.easy": "简单",
     "common.notFound": "页面不存在。",
+    "common.colon": "：",
+    "skip.main": "跳到主要内容",
+    "footer.rights": "原剧版权归各制作方所有；台词、字幕和原声片段仅供个人学习，登录后可见。",
+    "footer.archive": "旧内容：5S Online 与 IT 场景",
+    "footer.home": "个人主页",
+    "review.newLimit": "每天新卡上限",
   },
   vi: {
     "brand.title": "Học ngoại ngữ qua phim",
@@ -228,6 +234,12 @@ export const DICT = {
     "grade.good": "Nhớ",
     "grade.easy": "Dễ",
     "common.notFound": "Trang không tồn tại.",
+    "common.colon": ": ",
+    "skip.main": "Chuyển đến nội dung chính",
+    "footer.rights": "Bản quyền phim thuộc về các nhà sản xuất; lời thoại, phụ đề và đoạn âm thanh gốc chỉ dùng để tự học, cần đăng nhập mới xem được.",
+    "footer.archive": "Nội dung cũ: 5S Online và tình huống IT",
+    "footer.home": "Trang cá nhân",
+    "review.newLimit": "Giới hạn thẻ mới mỗi ngày",
   },
 };
 
