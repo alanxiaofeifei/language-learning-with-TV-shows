@@ -5,12 +5,13 @@ import unicodedata
 _ZH_DROP = re.compile(r"[\s，。！？、,.!?…\"'“”‘’]")
 
 def norm(s, zh, language=None):
-    """zh: drop spaces and punctuation. Other: lowercase, curly -> straight apostrophe,
+    """ja: normalize width and drop spaces, punctuation and symbols.
+    zh: drop spaces and punctuation. Other: lowercase, curly -> straight apostrophe,
     every other non [a-z0-9'] char becomes a space, runs of spaces collapse to one."""
     s = s or ""
     if language == "ja":
         return "".join(ch for ch in unicodedata.normalize("NFKC", s)
-                       if not ch.isspace() and not unicodedata.category(ch).startswith("P"))
+                       if not ch.isspace() and not unicodedata.category(ch).startswith(("P", "S")))
     if language == "fr":
         folded = unicodedata.normalize("NFKD", s.casefold())
         s = "".join(ch for ch in folded if not unicodedata.category(ch).startswith("M")).replace("œ", "oe").replace("æ", "ae")

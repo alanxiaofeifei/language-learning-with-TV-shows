@@ -119,6 +119,24 @@ class Commands(Base):
         with self.assertRaises(subprocess.TimeoutExpired):
             llm._run([sys.executable, "-c", "import time; time.sleep(30)"], "", 0.5, "/tmp")
 
+    def test_run_kills_and_reaps_on_interrupted_communication(self):
+        for error in (KeyboardInterrupt(), OSError("pipe failure")):
+            with self.subTest(error=type(error).__name__):
+                process = mock.Mock(pid=123, **{"communicate.side_effect": [error, ("", "")]})
+                with mock.patch.object(llm.subprocess, "Popen", return_value=process), \
+                     mock.patch.object(llm.os, "killpg") as kill:
+                    cleanup = mock.Mock()
+                    cleanup.attach_mock(process.communicate, "communicate")
+                    cleanup.attach_mock(kill, "killpg")
+                    with self.assertRaises(type(error)) as raised:
+                        llm._run(["fake"], "prompt", 5, "/tmp")
+                    self.assertIs(raised.exception, error)
+                    self.assertEqual(cleanup.mock_calls, [
+                        mock.call.communicate("prompt", timeout=5),
+                        mock.call.killpg(process.pid, llm.signal.SIGKILL),
+                        mock.call.communicate(),
+                    ])
+
 
 class Rotation(Base):
     def test_round_robin_start_alternates(self):
@@ -149,6 +167,29 @@ class Rotation(Base):
         bad = (0, json.dumps({"is_error": True, "result": "Claude AI usage limit reached"}), "")
         self.fake({"claude": [bad], "codex": [codex_reply('{"ok": 1}')]})
         self.assertEqual(llm.chat_json("s", "u"), {"ok": 1})
+
+    def test_claude_error_message_keeps_result_from_large_envelope(self):
+        result = "Claude AI usage limit reached"
+        envelope = json.dumps({"is_error": True, "result": result, "metadata": "x" * 250})
+        self.fake({"claude": [(0, envelope, "stderr")]})
+        with self.assertRaises(llm.ProviderError) as raised:
+            llm.call_claude("s", "u", 5)
+        self.assertEqual(raised.exception.kind, "rate")
+        self.assertTrue(str(raised.exception).endswith(result))
+
+    def test_slow_failure_exhausts_wait_budget_without_sleeping(self):
+        llm._cool["codex"] = [self.clock[0] + 60, 1]
+
+        def slow_failure(_cmd):
+            self.clock[0] += 90
+            return 1, "", "rate limit exceeded"
+
+        f = self.fake({"claude": [slow_failure], "codex": [codex_reply('{"ok": true}')]})
+        with mock.patch.dict(os.environ, {"LLM_MAX_WAIT": "80"}):
+            with self.assertRaisesRegex(RuntimeError, "rate limit exceeded"):
+                llm.chat_json("s", "u")
+        self.assertEqual([call[0] for call in f.calls], ["claude"])
+        self.assertEqual(self.slept, [])
 
     def test_exponential_cooldown_capped(self):
         waits = [llm._cool_down("claude") for _ in range(8)]

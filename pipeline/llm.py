@@ -5,7 +5,8 @@ chat_json(system, user) -> parsed JSON object. Default providers are the logged-
 Order comes from LLM_PROVIDERS (default "claude,codex"); the starting provider alternates
 per call. A provider that fails (non-zero exit, rate/usage limit, timeout, bad JSON) cools
 down exponentially (60 s -> 15 min). When every provider is cooling we sleep until the
-first recovers, up to LLM_MAX_WAIT seconds in total (default 3600), then raise.
+first recovers. The retry budget counts elapsed time, including CLI calls
+(LLM_MAX_WAIT, default 3600 seconds).
 
 Paid HTTP APIs (DeepSeek, GLM) are a last resort only: used when LLM_ALLOW_PAID=1 and
 the key is set, and only after the CLI providers are exhausted. Keys are never logged.
@@ -75,13 +76,13 @@ def _child_env():
 
 
 def _run(cmd, stdin_text, timeout, cwd):
-    """Run cmd in its own process group; kill the whole group on timeout. -> (rc, out, err)."""
+    """Run cmd in its own process group and kill the group if communication fails."""
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          cwd=cwd, env=_child_env(), text=True, encoding="utf-8", errors="replace",
                          start_new_session=True)
     try:
         out, err = p.communicate(stdin_text, timeout=timeout)
-    except subprocess.TimeoutExpired:
+    except BaseException:
         try:
             os.killpg(p.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
@@ -122,7 +123,7 @@ def call_claude(system, user, timeout):
         env = None
     if rc != 0 or not isinstance(env, dict) or env.get("is_error"):
         res = env.get("result") if isinstance(env, dict) else ""
-        _fail("claude", rc, "\n".join([str(res or ""), out, err]))
+        _fail("claude", rc, "\n".join([out, err, str(res or "")]))
     try:
         obj = extract_json(env.get("result") or "")
     except ValueError as e:
@@ -219,13 +220,14 @@ def chat_json(system, user, temperature=0.2, retries=3, timeout=240):
     """Return the parsed JSON object. `temperature` applies to paid APIs only (CLIs ignore it).
     `retries` caps non-rate-limit failures per CLI provider within this call, so one bad prompt
     cannot spin for LLM_MAX_WAIT; rate/usage limits only cool the provider and are waited out."""
+    started = _now()
     names = _providers()
     max_wait = float(os.environ.get("LLM_MAX_WAIT", "3600"))
     start = _rr[0] % len(names) if names else 0
     _rr[0] += 1
     order = names[start:] + names[:start]
     hard = {n: 0 for n in order}
-    waited, last = 0.0, None
+    last = None
     while True:
         live = [n for n in order if hard[n] < max(1, retries)]
         if not live:
@@ -246,14 +248,15 @@ def chat_json(system, user, temperature=0.2, retries=3, timeout=240):
         live = [n for n in order if hard[n] < max(1, retries)]
         if not live:
             break
-        pause = max(0.0, min(_cool.get(n, [0.0, 0])[0] for n in live) - _now())
+        now = _now()
+        waited = now - started
+        pause = max(0.0, min(_cool.get(n, [0.0, 0])[0] for n in live) - now)
+        if waited >= max_wait or waited + pause > max_wait:
+            break
         if pause <= 0:
             continue
-        if waited + pause > max_wait:
-            break
         _err(f"all CLI providers cooling; sleeping {pause:.0f}s (waited {waited:.0f}/{max_wait:.0f}s)")
         _sleep(pause)
-        waited += pause
     if os.environ.get("LLM_ALLOW_PAID") == "1" and any(os.environ.get(p[2]) for p in PAID_PROVIDERS):
         _err("CLI providers exhausted; falling back to paid API (LLM_ALLOW_PAID=1)")
         got = _paid(system, user, temperature, retries, timeout)

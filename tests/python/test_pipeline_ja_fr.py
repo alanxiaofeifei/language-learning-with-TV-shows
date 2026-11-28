@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pipeline" / "multi"))
 import build_show_data
+import extract_phrases_multi
 import ingest_srt
 from common import cfg, episodes, load, save
 from extract_phrases_multi import LEVELS, system as phrase_prompt
@@ -17,6 +18,30 @@ from translate_lines import system as translation_prompt
 
 
 class NewTextShows(unittest.TestCase):
+    def test_japanese_phrase_readings_omit_blank_and_missing_values(self):
+        phrases = [
+            {"idx": 0, "phrase": "りんご", "reading": "  "},
+            {"idx": 0, "phrase": "ぶどう"},
+            {"idx": 0, "phrase": "桃", "reading": " もも "},
+        ]
+        line = {"i": 0, "start": 0, "end": 1000, "ja": "りんご、ぶどう、桃"}
+        with TemporaryDirectory() as tmp:
+            gen = Path(tmp) / "gen"
+            save(str(gen / "S01E01.lines.json"), [line])
+            episode = {"n": 1, "code": "S01E01"}
+            with patch.object(sys, "argv", ["extract_phrases_multi.py", "nigeru-wa-haji", tmp]), \
+                 patch.object(extract_phrases_multi, "episodes", return_value=[episode]), \
+                 patch.object(extract_phrases_multi, "chat_json", return_value={"phrases": phrases}):
+                extract_phrases_multi.main()
+            blank, missing, valid = load(gen / "S01E01.phrases.json")
+            self.assertNotIn("reading", blank)
+            self.assertNotIn("reading", missing)
+            self.assertEqual(valid["reading"], "もも")
+
+    def test_japanese_matching_accepts_both_wave_dash_forms(self):
+        key = norm("そう〜です", False, "ja")
+        self.assertTrue(matches(key, norm("「そう～です！」", False, "ja"), True))
+
     def test_japanese_ingest_and_chinese_exports(self):
         srt = (
             "1\r\n00:00:00,100 --> 00:00:01,000\r\n"

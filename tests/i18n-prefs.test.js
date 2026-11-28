@@ -27,6 +27,11 @@ test('i18n: t() switches language, fills vars, falls back to zh', () => {
   assert.equal(t('nav.today'), '今天'); assert.equal(pick({ zh: '中' }, 'vi'), '中');
 });
 
+test('text-only transcript note describes original subtitles in both UI languages', () => {
+  assert.match(DICT.zh['ep.noteText'], /^原文字幕/);
+  assert.match(DICT.vi['ep.noteText'], /^Phụ đề gốc/);
+});
+
 test('prefs: defaults, local overrides, visible languages are display-only filtering', () => {
   assert.deepEqual(normalizeMe(null), DEFAULT_ME);
   const linh = normalizeMe({ visibleLangs: ['zh', 'en', 'NOPE'], uiLang: 'vi', explainLang: 'vi', name: 'Linh' });

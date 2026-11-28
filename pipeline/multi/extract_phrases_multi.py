@@ -90,8 +90,9 @@ def main():
                 key = f"meaning_{lang}"
                 if p.get(key): card[key] = str(p[key]).strip()
             if zh: card["py"] = pinyin(phrase)
-            if src == "ja" and isinstance(p.get("reading"), str):
-                card["reading"] = p["reading"].strip()
+            reading = p.get("reading")
+            if src == "ja" and isinstance(reading, str) and reading.strip():
+                card["reading"] = reading.strip()
             res.append(card)
         save(out, res); total += len(res)
         meta_p = os.path.join(gen, ep["code"] + ".meta.json"); meta = load(meta_p, {}) or {}
