@@ -152,7 +152,10 @@ class FetchSubdl(unittest.TestCase):
         manifest = load(str(Path(self.work) / "subdl-manifest.json"))
         self.assertEqual(manifest["S01E01"], {"release": "Show.S01.Pack", "file": "Show.S01E01.srt", "season_pack": True})
         rejected = load(str(Path(self.work) / "subdl-rejected.json"))
-        self.assertIn(fetch_subdl.file_id("ES", "/subtitle/20-21.zip"), rejected)
+        # The Italian member is rejected on its content; the zip itself only for E01 (it is not an E01-only fact).
+        self.assertIn(fetch_subdl.file_id("ES", "/subtitle/20-21.zip", "Show.S01E01.WEB.srt"), rejected)
+        self.assertIn(fetch_subdl.exhausted_id("ES", "/subtitle/20-21.zip", 1, 1), rejected)
+        self.assertNotIn(fetch_subdl.file_id("ES", "/subtitle/20-21.zip"), rejected)
         self.assertTrue(all(r.startswith("sha256:") for r in rejected))
         everything = json.dumps(manifest) + json.dumps(result) + "\n".join(logs)
         everything += "".join(p.read_text(encoding="utf-8") for p in Path(self.work).glob("*.json"))
@@ -665,6 +668,88 @@ class FetchSubdl(unittest.TestCase):
         self.assertIsNone(fetch_subdl.select_episode(self.client(stub), files(unpack(1, "X.S04E01.txt", "/subtitle/f/1",
                                                                                      format="srt")),
                                                      4, 1, "ES", set(), quiet))
+
+    def test_every_episode_marker_in_name_and_url_must_agree(self):
+        marks = fetch_subdl.episode_markers
+        self.assertEqual(marks("S04E01.S04E02.srt"), [(4, 1), (4, 2)])
+        self.assertEqual(marks("Show.S04E01E02.srt"), [(4, 1), (4, 2)])
+        self.assertEqual(marks("Show.S04E01-E02.srt"), [(4, 1), (4, 2)])
+        self.assertEqual(marks("Show 4x01 S04E01.srt"), [(4, 1), (4, 1)])
+        self.assertEqual(marks("Show.S04E01.Episodio.1080p.x264.srt"), [(4, 1)])
+        client = self.client(lambda u, h: srt(SPANISH))
+        # Codex's checks: two markers in one raw name, and metadata name vs URL basename.
+        for url in ("/sub/S04E01.S04E02.srt", "/sub/S04E01E02.srt", "/sub/S04E01.4x02.srt"):
+            sub = {"season": 4, "episode": 1, "url": url}
+            self.assertFalse(fetch_subdl.candidates([sub], 4, 1, "ES")[0].raw_ok, url)
+            self.assertIsNone(fetch_subdl.select_episode(client, [sub], 4, 1, "ES", set(), quiet), url)
+        for entry in (unpack(1, "S04E01.srt", "/sub/S04E02.srt"), unpack(1, "S04E01.srt", "/sub/x/S04E01.S04E02.srt"),
+                      unpack(1, "S04E01.S04E02.srt", "/sub/f/1"), unpack(None, "S04E02.srt", "/sub/S04E01.srt")):
+            for sub in ({"season": 4, "episode": 1, "url": "/subtitle/1.zip", "unpack_files": [entry]},
+                        {"season": 4, "full_season": True, "url": "/subtitle/p.zip", "unpack_files": [entry]}):
+                self.assertEqual(fetch_subdl.candidates([sub], 4, 1, "ES"), [], entry)
+                self.assertIsNone(fetch_subdl.select_episode(client, [sub], 4, 1, "ES", set(), quiet), entry)
+        # Agreeing names (or an archive / opaque URL basename) are still accepted.
+        for entry in (unpack(1, "S04E01.srt", "/sub/S04E01.srt"), unpack(1, "S04E01.srt", "/sub/f/1"),
+                      unpack(1, "S04E01.srt", "/sub/S04E01-E12.zip"), unpack(None, "x.srt", "/sub/S04E01.srt")):
+            sub = {"season": 4, "episode": 1, "url": "/subtitle/1.zip", "unpack_files": [entry]}
+            self.assertTrue(fetch_subdl.candidates([sub], 4, 1, "ES")[0].raw_ok, entry)
+            self.assertTrue(fetch_subdl.select_episode(client, [sub], 4, 1, "ES", set(), quiet), entry)
+        # Pack: the URL basename alone may name the episode; a zip member naming two episodes is skipped.
+        pack = {"season": 4, "full_season": True, "url": "/subtitle/p.zip",
+                "unpack_files": [unpack(None, "x.srt", "/sub/S04E01.srt")]}
+        self.assertTrue(fetch_subdl.candidates([pack], 4, 1, "ES")[0].raw_ok)
+        both = zipped({"S04E01.S04E02.srt": srt(SPANISH)})
+        pack = {"season": 4, "full_season": True, "url": "/subtitle/p.zip"}
+        for ep in (1, 2):
+            self.assertIsNone(fetch_subdl.select_episode(self.client(lambda u, h: both), [pack], 4, ep, "ES",
+                                                         set(), quiet))
+        one = zipped({"S04E01.srt": srt(SPANISH), "S04E02.srt": srt(ITALIAN)})
+        got = fetch_subdl.select_episode(self.client(lambda u, h: one), [pack], 4, 1, "ES", set(), quiet)
+        self.assertEqual(got[1], "S04E01.srt")
+
+    def test_episode_mismatch_rejection_is_scoped_to_that_episode(self):
+        shared = "/subtitle/x/S04E02.srt"
+        # E01's metadata points at a file named for E02; E02's own entry points at the same file.
+        subs = [{"release_name": "E1", "season": 4, "episode": 1, "url": shared},
+                {"release_name": "E2", "season": 4, "episode": 2, "url": shared}]
+        rejected = set()
+        stub = Stub({}, {shared: srt(SPANISH)})
+        self.assertIsNone(fetch_subdl.select_episode(self.client(stub), subs, 4, 1, "ES", rejected, quiet))
+        self.assertNotIn(fetch_subdl.file_id("ES", shared), rejected)
+        self.assertIn(fetch_subdl.exhausted_id("ES", shared, 4, 1), rejected)
+        self.assertTrue(fetch_subdl.select_episode(self.client(stub), subs, 4, 2, "ES", rejected, quiet))
+
+        # Through fetch() and the saved cache: E02 is found in the same run and nothing is downloaded again.
+        api = {4: {"status": True, "subtitles": subs}}
+        stub = Stub(api, {shared: srt(SPANISH)})
+        with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {4: 2}}):
+            result, _ = self.run_fetch("club-de-cuervos", stub)
+            self.assertEqual(result["seasons"]["S04"], {"found": ["E02"], "missing": ["E01"]})
+            self.assertEqual(stub.downloaded(), [shared, shared])
+            stub2 = Stub(api, stub.files)
+            self.run_fetch("club-de-cuervos", stub2)
+        self.assertEqual(stub2.downloaded(), [])
+        saved = load(str(Path(self.work) / "subdl-rejected.json"))
+        self.assertIn(fetch_subdl.exhausted_id("ES", shared, 4, 1), saved)
+        self.assertNotIn(fetch_subdl.file_id("ES", shared), saved)
+
+        # A cache from the first run (E01 only) still lets a later run fetch E02 from the same file.
+        os.remove(Path(self.work) / "srt" / "S04E02.es.srt")
+        stub3 = Stub(api, stub.files)
+        with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {4: 2}}):
+            result3, _ = self.run_fetch("club-de-cuervos", stub3)
+        self.assertEqual(result3["seasons"]["S04"]["found"], ["E02"])
+        self.assertEqual(stub3.downloaded(), [shared])
+
+        # Content failures stay path-wide: an Italian raw file is rejected for every episode.
+        bad = "/subtitle/y/S04E01.srt"
+        rejected = set()
+        subs = [{"season": 4, "episode": 1, "url": bad}, {"season": 4, "episode": 2, "url": bad}]
+        stub = Stub({}, {bad: srt(ITALIAN)})
+        self.assertIsNone(fetch_subdl.select_episode(self.client(stub), subs, 4, 1, "ES", rejected, quiet))
+        self.assertIn(fetch_subdl.file_id("ES", bad), rejected)
+        self.assertIsNone(fetch_subdl.select_episode(self.client(stub), subs, 4, 2, "ES", rejected, quiet))
+        self.assertEqual(stub.downloaded(), [bad])
 
 
 if __name__ == "__main__":

@@ -15,16 +15,19 @@ no hearing-impaired files (hi flag, *hi.srt, *.hi.*, spaHi, SDH). A raw (non-zip
 when the metadata names an eligible .srt for that exact episode; a season-pack zip must contain a member named
 for that episode. A file is accepted only if it parses to >= MIN_CUES cues and reads as the requested language
 (stopword ratio >= MIN_RATIO over >= MIN_WORDS words, and clearly more Spanish than Italian/Portuguese markers).
-A raw body also needs a file name (metadata name or URL basename) ending in .srt whose SxxEyy / NxNN marker, if
-any, is the requested episode. Missing (404/410), oversized or unreadable files fall through to the next
+A raw body also needs a file name (metadata name or URL basename) ending in .srt, and EVERY SxxEyy / NxNN marker
+in the metadata name and in the URL basename (unless it names an archive) must be the requested episode
+(S04E01.S04E02.srt, S04E01E02.srt, or a name S04E01.srt served from .../S04E02.srt never serve E01). Missing (404/410), oversized or unreadable files fall through to the next
 candidate; quota/auth failures (401/403/429) and the request/download budgets stop the run. Redirects are never
 followed automatically: each hop is charged to the same budget as the request, at most MAX_REDIRECTS hops are
 taken, redirect bodies are never read, and only https targets on *.subdl.com are followed.
 
 Writes WORKDIR/srt/SxxEyy.<lang>.srt (LF line endings, CR-only files normalised), WORKDIR/subdl-manifest.json
 {code: {release, file, season_pack}} and WORKDIR/subdl-rejected.json: opaque ids (sha256 of language, path and
-member) for files that failed and for (language, pack, season, episode) pairs whose pack was already inspected,
-so later runs never re-download them; delete it to retry. A cache from an older version (plain paths) is
+member) for files that failed on their own content (missing, too large, unreadable, not the language), for
+(language, path, season, episode) when a download was inspected for that episode and gave nothing (a file named
+for another episode is rejected only for this episode, never path-wide), and for paths known to serve a raw
+(non-zip) body, so later runs never re-download them; delete it to retry. A cache from an older version (plain paths) is
 rewritten as opaque ids as soon as it is loaded. Existing SRTs are never re-downloaded; seasons that
 are already complete make no API call. Both budgets are charged before every HTTP attempt, retries included:
 stops before MAX_DOWNLOADS downloads (anonymous limit is 300/day/IP) and MAX_API_REQUESTS API requests.
@@ -75,7 +78,10 @@ WORD = re.compile(r"[^\W\d_]+")
 PATH = re.compile(r"/[A-Za-z0-9_.\-/]+")
 UNSAFE = re.compile(r"[^\w .,'+()\[\]&-]")
 SECRET_PARAM = re.compile(r"((?:api[_-]?key|apikey|key|token|access_token|signature|sig|secret|password)\s*[=:])[^&\s'\"]*", re.I)
-EPISODE_IN_NAME = (re.compile(r"[Ss](\d{1,2})[ ._-]?[Ee](\d{1,3})"), re.compile(r"(?<!\d)(\d{1,2})x(\d{2,3})(?!\d)"))
+# SxxEyy (with E-continuations: S04E01E02, S04E01-E02) and NxNN episode markers in a file name.
+SXXEYY = re.compile(r"[Ss](\d{1,2})[ ._-]?[Ee](\d{1,3})((?:[ ._-]?[Ee]\d{1,3})*)")
+NXNN = re.compile(r"(?<!\d)(\d{1,2})x(\d{2,3})(?!\d)")
+ARCHIVE_EXT = (".zip", ".rar", ".7z")
 
 
 class SubdlError(Exception):
@@ -168,7 +174,13 @@ def file_id(lang, path, member=""):
 
 
 def exhausted_id(lang, path, season, episode):
+    """This download was inspected for this one episode and gave nothing (other episodes may still use it)."""
     return opaque_id("exhausted", lang.lower(), path, int(season), int(episode))
+
+
+def raw_body_id(lang, path):
+    """This path serves a raw (non-zip) body: only a candidate allowed to use a raw body needs to download it."""
+    return opaque_id("raw", lang.lower(), path)
 
 
 def load_rejected(path, lang):
@@ -217,20 +229,40 @@ def truthy(v):
     return v is True or (isinstance(v, (int, float)) and v != 0) or str(v).lower() in ("true", "1", "yes")
 
 
+def episode_markers(name):
+    """Every (season, episode) marker in a file name, in order: S04E01.S04E02.srt -> [(4, 1), (4, 2)],
+    S04E01E02.srt -> [(4, 1), (4, 2)], 4x01.srt -> [(4, 1)]."""
+    name, out = str(name or ""), []
+    for m in SXXEYY.finditer(name):
+        s = int(m[1])
+        out.append((s, int(m[2])))
+        out += [(s, int(e)) for e in re.findall(r"\d+", m[3] or "")]
+    out += [(int(m[1]), int(m[2])) for m in NXNN.finditer(name)]
+    return out
+
+
 def episode_from_name(name):
-    for pattern in EPISODE_IN_NAME:
-        m = pattern.search(str(name or ""))
-        if m:
-            return int(m[1]), int(m[2])
-    return None, None
+    marks = episode_markers(name)
+    return marks[0] if marks else (None, None)
 
 
-def raw_name_ok(name, season, episode):
-    """A raw (non-zip) body may stand for this episode only under an .srt name whose episode marker, if any,
-    is this exact episode (S04E02.srt never serves E01)."""
+def url_name(path):
+    """Basename of a download path whose episode markers count, or "" for an archive (it may name a range)."""
+    base = os.path.basename(str(path or ""))
+    return "" if base.lower().endswith(ARCHIVE_EXT) else base
+
+
+def markers_match(season, episode, *names):
+    """True if every episode marker in every name is this exact episode (no marker at all also passes)."""
+    return all(m == (season, episode) for n in names for m in episode_markers(n))
+
+
+def raw_name_ok(name, season, episode, *others):
+    """A raw (non-zip) body may stand for this episode only under a non-HI .srt name, and only if every episode
+    marker in that name and in the other names (URL basename) is this exact episode (S04E02.srt never serves E01)."""
     name = str(name or "")
-    s, e = episode_from_name(name)
-    return name.lower().endswith(".srt") and not is_hi(name) and s in (None, season) and e in (None, episode)
+    return (name.lower().endswith(".srt") and not any(is_hi(n) for n in (name, *others))
+            and markers_match(season, episode, name, *others))
 
 
 def http_get(url, headers, limit=MAX_BODY_BYTES):
@@ -325,17 +357,19 @@ def candidates(subtitles, season, episode, lang):
                     continue
                 if f.get("language") and str(f["language"]).upper() != lang:
                     continue
-                ns, ne = episode_from_name(name)
                 me = as_int(f.get("episode"))
-                # Name marker and metadata must both agree when present; a pack file needs at least one.
-                if ns not in (None, season) or ne not in (None, episode) or me not in (None, episode):
-                    continue
-                if pack and episode not in (ne, me):
-                    continue
                 path = clean_path(f.get("url"))
-                if path:
-                    bucket.append(Candidate(path, release, name, pack, episode, season,
-                                            raw_ok=raw_name_ok(name, season, episode)))
+                if not path:
+                    continue
+                base = url_name(path)
+                # Every marker in the name and the URL basename, and the metadata, must agree when present;
+                # a pack file needs at least one of them to name this episode.
+                if not markers_match(season, episode, name, base) or me not in (None, episode):
+                    continue
+                if pack and me != episode and not (episode_markers(name) or episode_markers(base)):
+                    continue
+                bucket.append(Candidate(path, release, name, pack, episode, season,
+                                        raw_ok=raw_name_ok(name, season, episode, base)))
         else:
             path = clean_path(sub.get("url"))
             if path:
@@ -482,21 +516,31 @@ def members(data, cand):
         name = os.path.basename(info.filename)
         if info.is_dir() or not name.lower().endswith(".srt") or is_hi(name):
             continue
-        s, e = episode_from_name(name)
-        if s not in (None, cand.season) or (e != cand.episode if cand.season_pack else e not in (None, cand.episode)):
+        marks = episode_markers(name)
+        if not markers_match(cand.season, cand.episode, name) or (cand.season_pack and not marks):
             continue
         yield name, (lambda info=info: read_capped(z, info))
+
+
+def skip_candidate(cand, lang, rejected):
+    """True if `rejected` already rules this candidate out for its episode (no download needed)."""
+    return bool({file_id(lang, cand.path), exhausted_id(lang, cand.path, cand.season, cand.episode)} & rejected
+                or (not cand.raw_ok and raw_body_id(lang, cand.path) in rejected))
 
 
 def select_episode(client, subs, season, episode, lang, rejected, log=print):
     """(candidate, file name, text) for the first valid file, or None.
 
-    Adds opaque ids to `rejected`: failed files (whole download or archive member) and, for a season-pack zip
-    already inspected for this episode, an exhausted (lang, pack, season, episode) id so it is not re-downloaded."""
+    Adds opaque ids to `rejected`: files that failed on their own content (whole download or archive member),
+    paths that serve a raw body, and an exhausted (lang, path, season, episode) id for a download inspected for
+    this episode without result. Episode mismatches are only ever recorded for this episode, so a file named for
+    E02 that E01's metadata pointed at is still tried for E02."""
     code, key = f"S{season:02d}E{episode:02d}", client.key
     for cand in candidates(subs, season, episode, lang):
         whole, done = file_id(lang, cand.path), exhausted_id(lang, cand.path, season, episode)
-        if whole in rejected or done in rejected:
+        if skip_candidate(cand, lang, rejected):
+            if done not in rejected and whole not in rejected:
+                rejected.add(done)   # known raw body this candidate may not use
             continue
         label = safe_name(cand.name or cand.release or cand.path, key)
         reusable = cand.season_pack and not cand.name
@@ -506,7 +550,12 @@ def select_episode(client, subs, season, episode, lang, rejected, log=print):
             rejected.add(whole)
             log(f"{code}: skip {label} ({exc})", file=sys.stderr)
             continue
-        pack_zip = cand.season_pack and data.startswith(b"PK")
+        if not data.startswith(b"PK"):
+            rejected.add(raw_body_id(lang, cand.path))
+            if not cand.raw_ok:
+                rejected.add(done)
+                log(f"{code}: skip {label} (raw file not named for this episode)", file=sys.stderr)
+                continue
         tried = 0
         try:
             for name, read in members(data, cand):
@@ -535,8 +584,8 @@ def select_episode(client, subs, season, episode, lang, rejected, log=print):
             continue
         if not tried:
             log(f"{code}: no eligible .srt for this episode in {label}", file=sys.stderr)
-        # A season-pack zip serves other episodes too: only mark it exhausted for this episode.
-        rejected.add(done if pack_zip else whole)
+        # Content failures are already recorded per member; the download may still serve other episodes.
+        rejected.add(done)
     return None
 
 
@@ -588,7 +637,7 @@ def fetch(show_id, work, lang="ES", dry_run=False, client=None, log=print):
                 continue
             if dry_run:
                 first = next((x for x in candidates(subs, season, ep, lang)
-                              if not {file_id(lang, x.path), exhausted_id(lang, x.path, season, ep)} & rejected), None)
+                              if not skip_candidate(x, lang, rejected)), None)
                 log(f"{code}: " + (f"would try {safe_name(first.name or first.release or first.path, client.key)} "
                                    f"({'pack' if first.season_pack else 'episode'})" if first else "no candidate"),
                     file=sys.stderr)
