@@ -77,3 +77,6 @@ Review: Antigravity `agy --mode plan --model gemini-4-argon-high` on this batch 
 
 ## Deploy record (2026-11-28)
 - Preview `b8893249-847e-4300-9a94-69b90e250fa5`, production `c62cf161-d39f-4403-b94c-6baa08d88a81` (main 8a62627). `USER_PREFS` secret set on both workers. Anonymous `/` 200; `/private`, `/private/me.json`, `/private/shows/*` → 302 Access login. Owner/Linh logged-in views not testable from the box.
+
+## Deploy record: Spanish (2026-11-28 ~21:30 Asia/Saigon, UTC+7)
+- Merged PR #4 (`09dabfd`). Preview Worker version `ed3a51df-7e13-40a6-8e5d-ea6cf01a454c`; production `be3a7da1-f357-49e3-a6d0-9be5c65fbeb9`. Anonymous `/` and `/shows/<id>/episodes.json` 200; `/private/me.json` and `/private/shows/<id>/...` → 302 Access login on both hosts. Owner/Linh logged-in views not testable from this box.
