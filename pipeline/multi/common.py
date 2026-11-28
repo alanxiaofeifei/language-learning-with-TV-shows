@@ -32,6 +32,28 @@ SHOWS = {
         "srtPrefix": "Friends",
         "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。",
     },
+    "seinfeld": {
+        "source": "text-only",
+        "tvsubtitlesId": 89,
+        "target": "en",
+        "langs": ["en", "zh", "vi"],
+        "translate": ["zh", "vi"],
+        "level": "CEFR",
+        "title": {"zh": "宋飞正传", "en": "Seinfeld"},
+        "srtPrefix": "Seinfeld",
+        "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。",
+    },
+    "silicon-valley": {
+        "source": "text-only",
+        "tvsubtitlesId": 1465,
+        "target": "en",
+        "langs": ["en", "zh", "vi"],
+        "translate": ["zh", "vi"],
+        "level": "CEFR",
+        "title": {"zh": "硅谷", "en": "Silicon Valley"},
+        "srtPrefix": "SiliconValley",
+        "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。重点关注现代科技和创业公司常用的英语词汇。",
+    },
 }
 
 def cfg(show_id):
