@@ -5,10 +5,10 @@ import {
   languageById, showsForLanguage, href, matchRoute, isComingLanguage, safeDecode, isMultiShow, showDataBase,
 } from '../site/lib/catalog.js';
 
-test('catalog: vi, zh, en, fr, ja ready; es/yue placeholders with planned picks', () => {
+test('catalog: vi, zh, en, fr, ja, es ready; yue placeholder with planned picks', () => {
   assert.deepEqual(LANGUAGES.map((l) => l.id), ['vi', 'zh', 'en', 'fr', 'ja', 'es', 'yue']);
   const ready = LANGUAGES.filter((l) => l.status === 'ready').map((l) => l.id);
-  assert.deepEqual(ready, ['vi', 'zh', 'en', 'fr', 'ja']);
+  assert.deepEqual(ready, ['vi', 'zh', 'en', 'fr', 'ja', 'es']);
   assert.deepEqual(languageById('vi').shows, ['ve-nha-di-con']);
   assert.deepEqual(languageById('zh').shows, ['dou-ting-hao']);
   assert.deepEqual(languageById('en').shows, ['friends', 'seinfeld', 'silicon-valley', 'desperate-housewives']);
@@ -22,7 +22,10 @@ test('catalog: vi, zh, en, fr, ja ready; es/yue placeholders with planned picks'
   assert.match(titles('fr'), /魁北克/);
   assert.deepEqual(languageById('fr').shows, ['lupin']);
   assert.deepEqual(languageById('ja').shows, ['nigeru-wa-haji']);
-  assert.match(titles('es'), /Club de Cuervos/); assert.match(titles('es'), /La casa de las flores/);
+  assert.deepEqual(languageById('es').shows, ['club-de-cuervos', 'la-casa-de-las-flores']);
+  assert.match(titles('es'), /西班牙本土/);
+  assert.doesNotMatch(titles('es'), /Club de Cuervos|La casa de las flores/);
+  assert.match(languageById('es').variant, /墨西哥/);
   assert.match(titles('yue'), /愛·回家之開心速遞/);
   assert.deepEqual(languageById('en').planned, []);
   assert.match(titles('zh'), /欢乐颂/); assert.match(titles('zh'), /我们与恶的距离/);
@@ -71,6 +74,29 @@ for (const [id, count, year] of [
   });
 }
 
+for (const [id, count, year, zh] of [
+  ['club-de-cuervos', 12, '2019 · S04', '乌鸦俱乐部'],
+  ['la-casa-de-las-flores', 22, '2018–2019 · S01–S02', '花之家'],
+]) {
+  test(`${id} is a text-only Spanish show with zh as the only translation`, () => {
+    const show = SHOWS[id];
+    assert.ok(isMultiShow(id));
+    assert.equal(show.language, 'es');
+    assert.equal(show.source, 'text-only');
+    assert.equal(show.watch, null);
+    assert.equal(show.year, year);
+    assert.equal(show.titleZh, zh);
+    assert.equal(show.episodes, count);
+    assert.deepEqual(show.langs, ['es', 'zh']);
+    assert.equal(show.levels, 'CEFR');
+    assert.equal(show.dataBase, `/private/shows/${id}`);
+    assert.equal(show.publicBase, `/shows/${id}`);
+    assert.deepEqual(show.tracks, ['short', 'long']);
+    assert.deepEqual(showsForLanguage('es').map((s) => s.id), ['club-de-cuervos', 'la-casa-de-las-flores']);
+    assert.equal(isComingLanguage('es'), false);
+  });
+}
+
 test('new show routes round-trip and cross-language shows 404', () => {
   const cases = [
     { page: 'lang', lang: 'zh' },
@@ -86,6 +112,9 @@ test('new show routes round-trip and cross-language shows 404', () => {
     { page: 'track', lang: 'ja', show: 'nigeru-wa-haji', track: 'long' },
     { page: 'ep', lang: 'fr', show: 'lupin', ep: 5 },
     { page: 'track', lang: 'fr', show: 'lupin', track: 'long' },
+    { page: 'ep', lang: 'es', show: 'club-de-cuervos', ep: 12 },
+    { page: 'track', lang: 'es', show: 'la-casa-de-las-flores', track: 'long' },
+    { page: 'day', lang: 'es', show: 'la-casa-de-las-flores', track: 'short', day: 84 },
   ];
   for (const rec of cases) {
     const got = matchRoute(href(rec));
@@ -93,6 +122,7 @@ test('new show routes round-trip and cross-language shows 404', () => {
   }
   assert.equal(matchRoute('#/en/dou-ting-hao').page, 'notfound');
   assert.equal(matchRoute('#/zh/friends/ep/1').page, 'notfound');
+  assert.equal(matchRoute('#/fr/club-de-cuervos').page, 'notfound');
   assert.equal(matchRoute('#/vi/ve-nha-di-con/part/3').part, 3);
 });
 

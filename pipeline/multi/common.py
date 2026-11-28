@@ -92,6 +92,34 @@ SHOWS = {
         "srtPrefix": "Lupin",
         "audience": "用自然的中文讲解法国法语，按 CEFR 分级。先打好法国法语基础，魁北克法语差异以后补充。",
     },
+    "club-de-cuervos": {
+        "source": "text-only",
+        "target": "es",
+        "langs": ["es", "zh"],
+        "translate": ["zh"],
+        "explainLangs": ["zh"],
+        "level": "CEFR",
+        "title": {"zh": "乌鸦俱乐部", "es": "Club de Cuervos"},
+        "srtPrefix": "ClubDeCuervos",
+        "subdlTmdbId": 63314,
+        "subdlSeasons": [4],                  # S01–S03 have no Spanish subtitles on SubDL
+        "seasonEpisodes": {4: 12},
+        "audience": "用自然的中文讲解墨西哥 / 拉美西班牙语，按 CEFR 分级。遇到地区俚语（güey、no manches、chido、ahorita、¿qué onda? 等）要注明是墨西哥口语及语气轻重；和西班牙本土西语用法不同时（如 ustedes 代替 vosotros、coche/carro、ordenador/computadora）简短说明。",
+    },
+    "la-casa-de-las-flores": {
+        "source": "text-only",
+        "target": "es",
+        "langs": ["es", "zh"],
+        "translate": ["zh"],
+        "explainLangs": ["zh"],
+        "level": "CEFR",
+        "title": {"zh": "花之家", "es": "La casa de las flores"},
+        "srtPrefix": "LaCasaDeLasFlores",
+        "subdlTmdbId": 80169,
+        "subdlSeasons": [1, 2],
+        "seasonEpisodes": {1: 13, 2: 9},
+        "audience": "用自然的中文讲解墨西哥 / 拉美西班牙语，按 CEFR 分级。遇到地区俚语（güey、no manches、chido、ahorita、¿qué onda? 等）要注明是墨西哥口语及语气轻重；和西班牙本土西语用法不同时（如 ustedes 代替 vosotros、coche/carro、ordenador/computadora）简短说明。",
+    },
 }
 
 def cfg(show_id):
@@ -121,6 +149,14 @@ def episodes(show_id, work):
             os.path.basename(path).split(".")[0]
             for path in glob.glob(os.path.join(srt_dir, f"S??E??.{target}.srt"))
         })
+        # A configured seasonEpisodes {season: count} is authoritative here too: SRTs left over from older
+        # fetches (other seasons, E13 of a 12-episode season) must not shift the public numbering.
+        counts = {int(k): int(v) for k, v in (c.get("seasonEpisodes") or {}).items()}
+        if counts:
+            def in_range(code):
+                m = re.fullmatch(r"S(\d+)E(\d+)", code)
+                return bool(m) and 1 <= int(m[2]) <= counts.get(int(m[1]), 0)
+            codes = [code for code in codes if in_range(code)]
         for code in codes:
             srt = os.path.join(srt_dir, f"{code}.{target}.srt")
             if os.path.isfile(srt):

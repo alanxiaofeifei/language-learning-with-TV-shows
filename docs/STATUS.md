@@ -2,13 +2,20 @@
 
 Updated 2026-11-28 19:20 (Asia/Saigon, UTC+7).
 
+## Spanish shows (feat/es-shows, 2026-11-28) — data built
+- Spanish (Mexican / Latin-American baseline) is a ready language in the catalog: 《Club de Cuervos》 乌鸦俱乐部 S04 (12 eps, short-track pick, `2019 · S04`) and 《La casa de las flores》 花之家 S01–S02 (13 + 9 = 22 eps, long-track pick, `2018–2019 · S01–S02`). Text only, es + zh reader, CEFR cards, zh translations and explanations only (no Vietnamese). A Spain-Spanish show stays a planned later stage.
+- Club de Cuervos S01–S03 have no Spanish subtitles on SubDL, so only S04 is included.
+- New `pipeline/multi/fetch_subdl.py` (SubDL API; key from env `SUBDL_API_KEY` only, redacted everywhere). After the Codex review it also sanitises upstream names at every output, stores only opaque ids in `subdl-rejected.json`, charges budgets per HTTP attempt, falls through on 404/unreadable candidates, records inspected packs per episode, needs episode metadata for raw bodies, caps sizes, treats `seasonEpisodes` as authoritative, accepts only `--lang ES` and normalises CR-only SRTs. After the second Codex review it also drops unparseable URLs silently, rewrites legacy plain-path rejected caches as opaque ids on load, follows redirects itself (each hop charged, at most 3, https `*.subdl.com` only, bodies never read), checks a zip member's declared size and compression (stored/deflate only) before opening it, requires raw bodies to have an `.srt` name whose episode marker matches, and `episodes()` ignores SRTs outside `seasonEpisodes`. Known gap (out of scope): Spanish lyric cleanup still misses trailing ♪ and wrapped `# … #` lyric lines. Spanish SRT cleanup, ñ-preserving phrase matching and zh-only prompts in `pipeline/multi/*`.
+- Data built (private, behind Access, not in Git): 《Club de Cuervos》 S04 12/12 eps, 12,221 lines, 180 phrases; 《La casa de las flores》 S01 13/13 + S02 9/9 = 22 eps, 10,925 lines, 332 phrases. SubDL's Spanish packs for La casa S02 hold only 9 episodes, and there is no Spanish S03 or S01–S03 (Cuervos) upstream; nothing from other sources was used. zh translations via subscription CLIs (Codex gpt-6-luna low 181 calls, Claude haiku 165 calls); no paid API. Public lists `site/shows/<id>/episodes.json` committed. Linh's `visibleLangs` (zh+en) keeps the Spanish card hidden for her; no `USER_PREFS` change needed.
+- Deploy record: (operator)
+
 ## Phase 2 ship (feat/ja-fr-shows)
 Ready languages and shows (private data behind Access, not in Git):
 - Vietnamese: 《回家吧，孩子》 82 parts / 1,239 phrases / 419 clips (unchanged).
 - Chinese: 《都挺好》 46 eps / 37,184 lines / 658 phrases / 658 official-YouTube clips.
 - English (text-only): 《Friends》 S01–S02 48/691; 《Seinfeld》 S01–S02 17/236 (S01E00 has no English subtitle upstream, skipped); 《Silicon Valley》 S01 8/114; 《Desperate Housewives》 S01 22/321 (S01E16 missing upstream, skipped).
 - Japanese (text-only): 《逃げるは恥だが役に立つ》 S01 11/164 (zh translations only).
-- French (text-only, France French baseline): 《Lupin》 Part 1 5/75 (zh translations only). Spanish and Cantonese stay placeholders.
+- French (text-only, France French baseline): 《Lupin》 Part 1 5/75 (zh translations only). Spanish and Cantonese stayed placeholders in this ship (Spanish: see above).
 
 Per-user display (secret `USER_PREFS`, emails not in Git): Alan / defaults hide Vietnamese translations (`hideLangs: ["vi"]`); Linh sees Vietnamese translations on Chinese and English shows (`hideLangs: []`, visible languages zh+en, Vietnamese UI). Display only, not authorization.
 

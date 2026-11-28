@@ -105,6 +105,20 @@ export const SHORT_WEEKS = {
     { zh: ["只看法语", "关闭译文，读完一段后核对理解。"], vi: ["Chỉ đọc tiếng Pháp", "Tắt bản dịch, đọc một đoạn rồi đối chiếu cách hiểu."] },
     { zh: ["CEFR 复习", "按 CEFR 等级回顾卡片，为常用表达各写一个新例句。"], vi: ["Ôn theo CEFR", "Ôn thẻ theo cấp CEFR và đặt câu mới với các cách nói thông dụng."] },
   ],
+  es: [
+    { zh: ["墨西哥西语入门", "先开西语原文 + 中文，习惯语速；注意拉美的 seseo：z 以及 e、i 前的 c（cena、cielo、zapato）都读 /s/；a、o、u 前的 c 仍读 /k/（casa）。"], vi: ["Làm quen với tiếng Tây Ban Nha Mexico", "Bật nguyên văn tiếng Tây Ban Nha + bản dịch, quen tốc độ nói; để ý seseo ở Mỹ Latinh: z và c đứng trước e, i (cena, cielo, zapato) đều đọc là /s/; c đứng trước a, o, u vẫn đọc là /k/ (casa)."] },
+    { zh: ["ser 与 estar", "身份、性质用 ser，状态、位置用 estar；把剧里的例子分成两栏。"], vi: ["ser và estar", "ser cho danh tính, bản chất; estar cho trạng thái, vị trí. Chia các ví dụ trong phim thành hai cột."] },
+    { zh: ["称呼：tú、usted、ustedes", "观察人物何时用 tú，何时用 usted；拉美复数一律用 ustedes，不用 vosotros。"], vi: ["Xưng hô: tú, usted, ustedes", "Quan sát khi nào nhân vật dùng tú, khi nào dùng usted; ở Mỹ Latinh số nhiều luôn là ustedes, không dùng vosotros."] },
+    { zh: ["常用不规则动词", "tener、ir、hacer、poder、querer 的现在时；用 ir a + 不定式说打算。"], vi: ["Động từ bất quy tắc thường gặp", "Thì hiện tại của tener, ir, hacer, poder, querer; dùng ir a + nguyên mẫu để nói dự định."] },
+    { zh: ["pretérito 与 imperfecto", "一次完成的动作 vs 背景和习惯；把一段剧情用两种过去时复述。"], vi: ["pretérito và imperfecto", "Hành động xảy ra một lần so với bối cảnh và thói quen; kể lại một đoạn phim bằng hai thì quá khứ."] },
+    { zh: ["墨西哥口语", "ahorita、¿mande?、órale、¿qué onda? 的意思和语气；ahorita 不一定是“马上”。"], vi: ["Khẩu ngữ Mexico", "Nghĩa và sắc thái của ahorita, ¿mande?, órale, ¿qué onda?; ahorita không hẳn là “ngay lập tức”."] },
+    { zh: ["俚语与分寸", "güey、no manches、neta、chido、padre：哪些只在熟人之间说，哪些会显得粗鲁。"], vi: ["Tiếng lóng và chừng mực", "güey, no manches, neta, chido, padre: câu nào chỉ nói với người thân quen, câu nào nghe thô."] },
+    { zh: ["宾语代词", "lo、la、le 和 se lo；代词放在变位动词前，或接在不定式、命令式后。"], vi: ["Đại từ tân ngữ", "lo, la, le và se lo; đại từ đứng trước động từ chia, hoặc gắn sau nguyên mẫu và mệnh lệnh."] },
+    { zh: ["虚拟式入门", "quiero que…、ojalá…、para que…：愿望、请求和目的后面用虚拟式。"], vi: ["Làm quen với thức giả định", "quiero que…, ojalá…, para que…: sau mong muốn, yêu cầu và mục đích dùng thức giả định."] },
+    { zh: ["家庭、钱与生意", "遗产、债务、合同、公司经营：练习数字、金额和日期的听写。"], vi: ["Gia đình, tiền bạc và kinh doanh", "Thừa kế, nợ nần, hợp đồng, điều hành công ty: luyện nghe chép số, số tiền và ngày tháng."] },
+    { zh: ["情绪与戏剧冲突", "指责、辩解、道歉与和解，留意指小词 -ito / -ita 的语气；这一周关掉中文，只看西语。"], vi: ["Cảm xúc và xung đột kịch tính", "Trách móc, thanh minh, xin lỗi và làm hòa; để ý sắc thái của hậu tố giảm nhẹ -ito / -ita. Tuần này tắt bản dịch, chỉ đọc tiếng Tây Ban Nha."] },
+    { zh: ["CEFR 复习与地区差异", "按 CEFR 等级回顾卡片；整理墨西哥和西班牙的用词差异，如 carro / coche、computadora / ordenador。"], vi: ["Ôn theo CEFR và khác biệt vùng miền", "Ôn thẻ theo cấp CEFR; ghi lại khác biệt từ ngữ giữa Mexico và Tây Ban Nha, ví dụ carro / coche, computadora / ordenador."] },
+  ],
 };
 
 // Long-track outlines: short, human-readable stages. Available shows link to their short tracks.
@@ -138,5 +152,13 @@ export const LONG_OUTLINES = {
       goal: { zh: "以法国法语打底，按 CEFR 练习口语表达和叙事。", vi: "Xây nền tảng tiếng Pháp ở Pháp, luyện cách nói và kể chuyện theo CEFR." } },
     { show: "魁北克剧待定", showVi: "Phim Québec chưa chọn", status: "planned", span: { zh: "后续阶段", vi: "Giai đoạn sau" },
       goal: { zh: "学习魁北克法语的词汇、发音和口语差异。", vi: "Học khác biệt về từ vựng, phát âm và khẩu ngữ Québec." } },
+  ],
+  es: [
+    { show: "La casa de las flores", showId: "la-casa-de-las-flores", status: "now", span: { zh: "第 1–2 年 · 核心课程", vi: "Năm 1–2 · chương trình chính" },
+      goal: { zh: "用墨西哥城的家庭剧打底：日常口语、家庭称呼、ser / estar 和过去时，在语境里练到 B1。", vi: "Xây nền tảng bằng phim gia đình ở Thành phố Mexico: khẩu ngữ hằng ngày, xưng hô trong gia đình, ser / estar và thì quá khứ; luyện tới B1 trong ngữ cảnh." } },
+    { show: "Club de Cuervos", showId: "club-de-cuervos", status: "now", span: { zh: "第 3 年 · 足球与生意模块", vi: "Năm 3 · học phần bóng đá và kinh doanh" },
+      goal: { zh: "球队经营和家族生意：职场用语、谈判、墨西哥俚语和虚拟式，向 B2 推进。", vi: "Điều hành đội bóng và kinh doanh gia đình: từ ngữ công sở, đàm phán, tiếng lóng Mexico và thức giả định; tiến tới B2." } },
+    { show: "西班牙本土西语剧待定", showVi: "Phim Tây Ban Nha chưa chọn", status: "planned", span: { zh: "后续阶段", vi: "Giai đoạn sau" },
+      goal: { zh: "学习西班牙本土西语：vosotros、发音（区分 c / z 与 s）和用词差异。", vi: "Học tiếng Tây Ban Nha ở Tây Ban Nha: vosotros, phát âm (phân biệt c / z với s) và khác biệt từ vựng." } },
   ],
 };

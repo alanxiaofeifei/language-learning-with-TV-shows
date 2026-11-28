@@ -166,6 +166,8 @@ function phraseCard(show, p, ep) {
 }
 
 // ---- views ----
+// Languages with several ready shows get a written long-track summary instead of "this show, then {next}".
+const LONG_BLURB = { en: "show.longBlurbEn", es: "show.longBlurbEs" };
 async function viewShow(show) {
   const st = store(show.id);
   await Promise.all([loadPublic(show), loadIndex(show)]);
@@ -186,7 +188,7 @@ async function viewShow(show) {
         progressBar(st.doneDays.length, SHORT_DAYS), h("p", { class: "muted" }, t("show.progressDays", { d: st.doneDays.length }))),
       h("a", { class: "track-card long reveal", href: go(show, { page: "track", track: "long" }), "data-tilt": "1" },
         h("p", { class: "length" }, t("track.longLength")), h("h2", {}, t("track.long")),
-        h("p", {}, show.language === "en" ? t("show.longBlurbEn") : t("show.longBlurb", { next })))),
+        h("p", {}, LONG_BLURB[show.language] ? t(LONG_BLURB[show.language]) : t("show.longBlurb", { next })))),
     watchPanel(show),
     episodeList(show),
   ];
@@ -352,7 +354,7 @@ function viewPlan(show) {
 function viewLong(show) {
   const stages = LONG_OUTLINES[show.language] || [];
   return [
-    h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t(show.language === "en" ? "show.longBlurbEn" : "long.lede"))),
+    h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t(LONG_BLURB[show.language] || "long.lede"))),
     h("div", { class: "stage-list" }, stages.map((s) => h("section", { class: "panel stage-card reveal" + (s.status === "now" ? " now" : "") },
       h("p", { class: "eyebrow" }, `${pick(s.span)} · ${s.status === "now" ? t("long.now") : t("long.planned")}`),
       h("h2", {}, s.status === "now" ? h("a", { href: go(SHOWS[s.showId || show.id], { page: "track", track: "short" }) }, s.show) : uiLang() === "vi" ? s.showVi || s.show : s.show),
