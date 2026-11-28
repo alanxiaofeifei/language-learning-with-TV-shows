@@ -49,7 +49,7 @@ test('new shows have their own private data base and source types', () => {
 for (const [id, count, year] of [
   ['seinfeld', 17, '1990–1993 · S01–S02'],
   ['silicon-valley', 8, '2014 · S01'],
-  ['desperate-housewives', 22, '2004–2005 · S01'],
+  ['desperate-housewives', 23, '2004–2005 · S01'],
 ]) {
   test(`${id} has text-only English routes for both tracks`, () => {
     const show = SHOWS[id];
@@ -182,4 +182,16 @@ test('legacy hashes alias to the Vietnamese show and unknown routes 404', () => 
   assert.equal(safeDecode('100%'), '100%');
   assert.equal(matchRoute('#/search/100%').q, '100%');
   assert.equal(languageById('ja').variant, '东京标准音');
+});
+
+test('multi shows keep language/show context on tutorial routes', () => {
+  for (const id of ['friends', 'dou-ting-hao', 'desperate-housewives', 'club-de-cuervos']) {
+    const lang = SHOWS[id].language;
+    for (const page of ['vlc', 'download']) {
+      const url = href({ page, lang, show: id });
+      assert.equal(url, `#/${lang}/${id}/${page}`);
+      const r = matchRoute(url);
+      assert.deepEqual([r.page, r.lang, r.show, r.alias], [page, lang, id, undefined]);
+    }
+  }
 });

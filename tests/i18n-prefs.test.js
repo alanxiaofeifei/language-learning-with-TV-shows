@@ -87,3 +87,20 @@ test('reader preferences hide Vietnamese translations and preserve target langua
   assert.deepEqual(explainOf(show, card, { ...alan, explainLang: 'vi' }), { meaning: '', explain: 'zh explanation', usage: '' });
   assert.deepEqual(explainOf(show, card, linh), { meaning: 'vi meaning', explain: 'vi explanation', usage: 'vi usage' });
 });
+
+test('tutorial links: zh and vi labels, routed inside the multi show', async () => {
+  const { tutorialLinks } = await import('../site/multi.js');
+  assert.equal(DICT.zh['tutorial.vlc'], 'VLC 怎么用');
+  assert.equal(DICT.zh['tutorial.download'], '怎么下载视频');
+  assert.equal(DICT.vi['tutorial.vlc'], 'Cách dùng VLC');
+  assert.equal(DICT.vi['tutorial.download'], 'Cách tải video');
+  setUiLang('vi');
+  assert.deepEqual(tutorialLinks(SHOWS.friends), [
+    { page: 'vlc', href: '#/en/friends/vlc', label: 'Cách dùng VLC' },
+    { page: 'download', href: '#/en/friends/download', label: 'Cách tải video' },
+  ]);
+  setUiLang('zh');
+  assert.deepEqual(tutorialLinks(SHOWS['dou-ting-hao']).map((l) => [l.href, l.label]), [
+    ['#/zh/dou-ting-hao/vlc', 'VLC 怎么用'], ['#/zh/dou-ting-hao/download', '怎么下载视频'],
+  ]);
+});

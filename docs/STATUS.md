@@ -92,3 +92,7 @@ Review: Antigravity `agy --mode plan --model gemini-4-argon-high` on this batch 
 ## Spanish lyric cleanup (2026-11-28)
 - Re-ingested both Spanish shows: Club de Cuervos 12,180 lines (was 12,221), La casa de las flores 10,875 (was 10,925); 180 and 331 phrase cards; all lines keep their zh translation (no LLM re-run); no ♪/#-lyric lines remain.
 - Known hardening gaps in the offline `fetch_subdl.py` (Codex review 4, not fixed; the fetch already ran on real data and was validated by episode/line counts and Spanish checks): raw bodies with a conflicting top-level filename or a redirect to another episode's basename; legacy path-wide rejection entries from an earlier commit are not versioned; a body containing the active key is not rejected; `reindex_phrases.py` matches by start/end/text and is ambiguous only if two cues share both timestamps.
+
+## DH S01E16 and multi-show tutorial links (2026-11-28)
+- Desperate Housewives S01E16 "The Ladies Who Lunch" added from a SubDL English pack (non-HI srt, promo title cue removed): 587 lines (zh+vi translations), 15 phrase cards; the show now has 23/23 episodes of S01 and 336 cards. Study episode numbers after E16 shift by one.
+- VLC and download tutorial buttons now appear on multi-show show and episode pages (zh and vi labels).
