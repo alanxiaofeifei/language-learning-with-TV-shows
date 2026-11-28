@@ -6,56 +6,101 @@ export const LANGUAGES = [
   {
     id: "vi",
     nameZh: "越南语",
+    nameVi: "Tiếng Việt",
     nameNative: "Tiếng Việt",
     variant: "北越 · 河内口音",
+    variantVi: "Miền Bắc · giọng Hà Nội",
     status: "ready",
     shows: ["ve-nha-di-con"],
+    planned: [{ track: "long", title: "Gạo nếp gạo tẻ", noteZh: "长期加选：南越口音", noteVi: "Bổ sung dài hạn: giọng miền Nam" }],
+  },
+  {
+    id: "zh",
+    nameZh: "中文",
+    nameVi: "Tiếng Trung",
+    nameNative: "简体中文",
+    variant: "中国大陆为主，含台湾模块",
+    variantVi: "Chủ yếu Trung Quốc đại lục, có học phần Đài Loan",
+    status: "ready",
+    shows: ["dou-ting-hao"],
+    planned: [
+      { track: "long", title: "欢乐颂 1", noteZh: "长期第二部：都市职场", noteVi: "Dài hạn phần 2: công sở đô thị" },
+      { track: "long", title: "我们与恶的距离", noteZh: "长期台湾模块：台湾用语与繁体", noteVi: "Học phần Đài Loan: từ ngữ Đài Loan, chữ phồn thể" },
+    ],
   },
   {
     id: "en",
     nameZh: "英语",
+    nameVi: "Tiếng Anh",
     nameNative: "English",
     variant: "美式英语",
-    status: "coming",
-    shows: [],
+    variantVi: "Tiếng Anh Mỹ",
+    status: "ready",
+    shows: ["friends"],
+    planned: [
+      { track: "long", title: "Seinfeld", noteZh: "长期第二部：日常吐槽与快语速", noteVi: "Dài hạn phần 2: hội thoại đời thường, nói nhanh" },
+      { track: "long", title: "Desperate Housewives", noteZh: "长期第三部：郊区生活", noteVi: "Dài hạn phần 3: đời sống ngoại ô" },
+      { track: "long", title: "Silicon Valley", noteZh: "长期科技职场模块", noteVi: "Học phần công nghệ / công sở" },
+    ],
   },
   {
     id: "fr",
     nameZh: "法语",
+    nameVi: "Tiếng Pháp",
     nameNative: "Français",
     variant: "加拿大法语",
+    variantVi: "Tiếng Pháp Canada",
     status: "coming",
     shows: [],
+    planned: [
+      { track: "short", title: "Lupin", noteZh: "法国法语打底", noteVi: "Nền tảng tiếng Pháp chuẩn" },
+      { track: "long", title: "魁北克剧待定", titleVi: "Phim Québec (chưa chọn)", noteZh: "加拿大法语", noteVi: "Tiếng Pháp Canada" },
+    ],
   },
   {
     id: "ja",
     nameZh: "日语",
+    nameVi: "Tiếng Nhật",
     nameNative: "日本語",
     variant: "东京标准音",
+    variantVi: "Giọng chuẩn Tokyo",
     status: "coming",
     shows: [],
+    planned: [{ track: "short", title: "逃げるは恥だが役に立つ", noteZh: "第一部", noteVi: "Phim đầu tiên" }],
   },
   {
     id: "es",
     nameZh: "西班牙语",
+    nameVi: "Tiếng Tây Ban Nha",
     nameNative: "Español",
     variant: "美式 / 拉美西班牙语",
+    variantVi: "Tây Ban Nha Mỹ Latinh",
     status: "coming",
     shows: [],
+    planned: [
+      { track: "short", title: "Club de Cuervos", noteZh: "短期版", noteVi: "Lộ trình ngắn" },
+      { track: "long", title: "La casa de las flores", noteZh: "长期版", noteVi: "Lộ trình dài" },
+    ],
   },
   {
     id: "yue",
     nameZh: "粤语",
+    nameVi: "Tiếng Quảng Đông",
     nameNative: "粵語",
     variant: "香港广东话",
+    variantVi: "Tiếng Quảng Đông Hồng Kông",
     status: "coming",
     shows: [],
+    planned: [{ track: "short", title: "愛·回家之開心速遞", noteZh: "第一部", noteVi: "Phim đầu tiên" }],
   },
 ];
 
+// kind "vn" = the original Vietnamese app (data under /private/data); kind "multi" = generic show
+// built by pipeline/multi (private data under /private/shows/<id>/, public episode list under /shows/<id>/).
 export const SHOWS = {
   "ve-nha-di-con": {
     id: "ve-nha-di-con",
+    kind: "vn",
     language: "vi",
     titleNative: "Về nhà đi con",
     titleZh: "回家吧，孩子",
@@ -64,7 +109,51 @@ export const SHOWS = {
     parts: 82,
     tracks: ["short", "long"],
   },
+  "dou-ting-hao": {
+    id: "dou-ting-hao",
+    kind: "multi",
+    language: "zh",
+    source: "youtube-official",
+    titleNative: "都挺好",
+    titleZh: "都挺好",
+    titleVi: "Tất cả đều ổn",
+    titleEn: "All is Well",
+    mark: "都",
+    year: "2019",
+    channel: "正午阳光官方频道",
+    channelVi: "Daylight Entertainment (正午阳光)",
+    playlist: "PL2Vcf2jYz5dfh5rHzOEok_gDLJf39MhuO",
+    dataBase: showDataBase("dou-ting-hao"),
+    publicBase: "/shows/dou-ting-hao",
+    episodes: 46,
+    langs: ["zh", "py", "vi", "en"],
+    levels: "HSK",
+    tracks: ["short", "long"],
+  },
+  friends: {
+    id: "friends",
+    kind: "multi",
+    language: "en",
+    source: "text-only",
+    titleNative: "Friends",
+    titleZh: "老友记",
+    titleVi: "Những người bạn",
+    titleEn: "Friends",
+    mark: "F",
+    year: "1994–1996 · S01–S02",
+    dataBase: showDataBase("friends"),
+    publicBase: "/shows/friends",
+    episodes: 48,
+    langs: ["en", "zh", "vi"],
+    levels: "CEFR",
+    tracks: ["short", "long"],
+    watch: { name: "HBO Max", url: "https://www.hbomax.com/" },
+  },
 };
+
+export function showDataBase(showId) {
+  return `/private/shows/${showId}`;
+}
 
 export const TRACKS = {
   short: {
@@ -106,6 +195,7 @@ export function href(parts) {
     case "stage": return `${base}/long/stage/${parts.stage}`;
     case "week": return `${base}/long/week/${parts.week}`;
     case "part": return `${base}/part/${parts.part}`;
+    case "ep": return `${base}/ep/${parts.ep}`;
     case "parts": return `${base}/parts`;
     case "review": return `${base}/review`;
     case "scenes": return parts.cat ? `${base}/scenes/${parts.cat}` : `${base}/scenes`;
@@ -129,6 +219,7 @@ const NAMED = [
   [new RegExp(`^#/(${LANG})/(${SHOW})/long/week/(\\d+)$`), (m) => ({ page: "week", lang: m[1], show: m[2], track: "long", week: +m[3] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/(short|long)$`), (m) => ({ page: "track", lang: m[1], show: m[2], track: m[3] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/part/(\\d+)$`), (m) => ({ page: "part", lang: m[1], show: m[2], part: +m[3] })],
+  [new RegExp(`^#/(${LANG})/(${SHOW})/ep/(\\d+)$`), (m) => ({ page: "ep", lang: m[1], show: m[2], ep: +m[3] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/parts$`), (m) => ({ page: "parts", lang: m[1], show: m[2] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/review$`), (m) => ({ page: "review", lang: m[1], show: m[2] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/scenes(?:/(\\w+))?$`), (m) => ({ page: "scenes", lang: m[1], show: m[2], cat: m[3] || null })],
@@ -176,6 +267,10 @@ function validate(route) {
     if (route.track && !show.tracks.includes(route.track)) return { page: "notfound" };
   }
   return route;
+}
+
+export function isMultiShow(showId) {
+  return SHOWS[showId]?.kind === "multi";
 }
 
 export function isComingLanguage(langId) {

@@ -229,3 +229,29 @@ html.motion-ready .chip.done { animation: pop .35s ease; }
   .part-list { columns: 1; }
   h1 { font-size: clamp(26px, 8vw, 36px); }
 }
+
+/* ---- multi-show pages (都挺好, Friends) ---- */
+.notice { background: #fbf7ef; }
+.notice p { margin: 0 0 6px; }
+.planned { list-style: none; padding: 0; margin: 12px auto 0; max-width: 36rem; text-align: left; }
+.planned li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.tag.level { background: var(--accent-pale); color: var(--accent-deep); font-weight: 700; }
+.phrase-zh { font-family: var(--display); font-size: 26px; }
+.lang-toggles { align-items: center; }
+.chip.toggle { display: inline-flex; gap: 4px; align-items: center; }
+.chip.toggle input { accent-color: var(--accent); margin: 0; }
+.transcript.multi li { grid-template-columns: 70px 1fr; }
+.transcript.multi .ts { grid-row: auto; }
+.transcript.multi span.ts { color: var(--muted); }
+.transcript.multi .stack { display: flex; flex-direction: column; gap: 1px; }
+.transcript.multi .l-zh { font-size: 19px; }
+.transcript.multi .l-en:first-child { font-size: 17px; }
+.transcript.multi .l-py { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 14px; color: var(--accent-deep); }
+.transcript.multi .l-vi, .transcript.multi .stack > span:not(:first-child):not(.l-py) { color: var(--muted); }
+.transcript.multi.hide-zh .l-zh, .transcript.multi.hide-py .l-py, .transcript.multi.hide-vi .l-vi, .transcript.multi.hide-en .l-en { display: none; }
+.stage-card.now { border-color: var(--accent); }
+.user-menu { position: relative; }
+.user-menu summary { list-style: none; cursor: pointer; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; color: var(--ink); }
+.user-menu summary::-webkit-details-marker { display: none; }
+.user-menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; background: var(--surface, #fff); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow); display: grid; gap: 8px; min-width: 190px; font-size: 14px; }
+.user-menu-pop label { display: flex; justify-content: space-between; gap: 8px; align-items: center; }

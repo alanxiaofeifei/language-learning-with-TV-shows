@@ -1,6 +1,14 @@
 # STATUS
 
-Updated 2026-11-28 06:30 (Asia/Saigon, UTC+7).
+Updated 2026-11-28 12:00 (Asia/Saigon, UTC+7).
+
+## Multi-language pilot (feat/multilang-pilot)
+- Ready languages: Vietnamese (回家吧，孩子), Chinese 《都挺好》 (official 正午阳光 YouTube, 46 eps: zh/pinyin/vi/en lines, 658 phrases with original-audio clips, bilingual SRTs) and English 《Friends》 S01–S02 (text mode: 48 eps, zh+vi translations, 691 phrases, no audio; timings are approximate). fr/ja/es/yue stay placeholders with planned picks.
+- Access: separate policy "TV study: Alan + Linh via Google" on both TV Access apps (quota dashboard policy untouched).
+- Worker `/private/me.json` gives per-user display defaults from secret `USER_PREFS` (display only, not authorization); Linh's profile defaults to zh+en with a Vietnamese UI.
+- Review: Antigravity agy plan mode found 0 blockers in the final pass; earlier 4 major/15 minor fixed. DeepSeek translation/phrases only (no GLM).
+- Prepared, not shipped: `pipeline/multi/fetch_tvsubtitles.py` plus Seinfeld and Silicon Valley configs (S1 SRTs fetched locally).
+
 
 ## Done
 - Site is now a language picker at `#/`. Vietnamese (北越) is the only ready language: 《Về nhà đi con》回家吧，孩子, with a **12-week short track** (existing 84-day plan, `vndc:v1` progress kept) and a **5-year long track** (260 weeks, 6 stages: 立足 → 日常自如 → 社交与分寸 → 职场沟通 / Chilisin 工厂 IT → 接近母语听力 → 循环保持). Same 82 parts / 28,900 lines / 1,239 phrases / 419 clips.

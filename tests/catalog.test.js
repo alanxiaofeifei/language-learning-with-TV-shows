@@ -2,23 +2,65 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LANGUAGES, SHOWS, TRACKS, DEFAULT_SHOW,
-  languageById, showsForLanguage, href, matchRoute, isComingLanguage, safeDecode,
+  languageById, showsForLanguage, href, matchRoute, isComingLanguage, safeDecode, isMultiShow, showDataBase,
 } from '../site/lib/catalog.js';
 
-test('catalog lists six languages and only Vietnamese is ready', () => {
-  assert.deepEqual(LANGUAGES.map((l) => l.id), ['vi', 'en', 'fr', 'ja', 'es', 'yue']);
-  const ready = LANGUAGES.filter((l) => l.status === 'ready');
-  assert.equal(ready.length, 1);
-  assert.equal(ready[0].id, 'vi');
-  assert.deepEqual(ready[0].shows, ['ve-nha-di-con']);
+test('catalog: vi, zh, en ready; fr/ja/es/yue placeholders with planned picks', () => {
+  assert.deepEqual(LANGUAGES.map((l) => l.id), ['vi', 'zh', 'en', 'fr', 'ja', 'es', 'yue']);
+  const ready = LANGUAGES.filter((l) => l.status === 'ready').map((l) => l.id);
+  assert.deepEqual(ready, ['vi', 'zh', 'en']);
+  assert.deepEqual(languageById('vi').shows, ['ve-nha-di-con']);
+  assert.deepEqual(languageById('zh').shows, ['dou-ting-hao']);
+  assert.deepEqual(languageById('en').shows, ['friends']);
   for (const lang of LANGUAGES.filter((l) => l.status === 'coming')) {
     assert.equal(lang.shows.length, 0);
     assert.equal(isComingLanguage(lang.id), true);
     assert.equal(showsForLanguage(lang.id).length, 0);
+    assert.ok(lang.planned.length >= 1, lang.id + ' lists planned picks');
   }
+  const titles = (id) => languageById(id).planned.map((p) => p.title).join('|');
+  assert.match(titles('fr'), /Lupin/);
+  assert.match(titles('ja'), /逃げるは恥だが役に立つ/);
+  assert.match(titles('es'), /Club de Cuervos/); assert.match(titles('es'), /La casa de las flores/);
+  assert.match(titles('yue'), /愛·回家之開心速遞/);
+  assert.match(titles('en'), /Seinfeld/); assert.match(titles('en'), /Desperate Housewives/); assert.match(titles('en'), /Silicon Valley/);
+  assert.match(titles('zh'), /欢乐颂/); assert.match(titles('zh'), /我们与恶的距离/);
+  assert.match(titles('vi'), /Gạo nếp gạo tẻ/);
   assert.equal(SHOWS[DEFAULT_SHOW].language, 'vi');
+  assert.equal(SHOWS[DEFAULT_SHOW].dataBase, '/private/data');
   assert.deepEqual(SHOWS[DEFAULT_SHOW].tracks, ['short', 'long']);
   assert.ok(TRACKS.short && TRACKS.long);
+});
+
+test('new shows have their own private data base and source types', () => {
+  const dtt = SHOWS['dou-ting-hao'], fr = SHOWS.friends;
+  assert.equal(dtt.language, 'zh'); assert.equal(dtt.episodes, 46); assert.equal(dtt.source, 'youtube-official');
+  assert.equal(dtt.playlist, 'PL2Vcf2jYz5dfh5rHzOEok_gDLJf39MhuO');
+  assert.equal(dtt.dataBase, '/private/shows/dou-ting-hao'); assert.equal(showDataBase('x'), '/private/shows/x');
+  assert.equal(fr.language, 'en'); assert.equal(fr.source, 'text-only'); assert.equal(fr.episodes, 48);
+  assert.equal(fr.dataBase, '/private/shows/friends'); assert.equal(fr.watch.url, 'https://www.hbomax.com/');
+  assert.ok(isMultiShow('friends') && isMultiShow('dou-ting-hao') && !isMultiShow('ve-nha-di-con'));
+});
+
+test('new show routes round-trip and cross-language shows 404', () => {
+  const cases = [
+    { page: 'lang', lang: 'zh' },
+    { page: 'show', lang: 'zh', show: 'dou-ting-hao' },
+    { page: 'ep', lang: 'zh', show: 'dou-ting-hao', ep: 46 },
+    { page: 'track', lang: 'zh', show: 'dou-ting-hao', track: 'long' },
+    { page: 'day', lang: 'en', show: 'friends', track: 'short', day: 84 },
+    { page: 'plan', lang: 'en', show: 'friends', track: 'short' },
+    { page: 'parts', lang: 'en', show: 'friends' },
+    { page: 'review', lang: 'en', show: 'friends' },
+    { page: 'ep', lang: 'en', show: 'friends', ep: 1 },
+  ];
+  for (const rec of cases) {
+    const got = matchRoute(href(rec));
+    for (const [k, v] of Object.entries(rec)) assert.equal(got[k], v, `${href(rec)} ${k}`);
+  }
+  assert.equal(matchRoute('#/en/dou-ting-hao').page, 'notfound');
+  assert.equal(matchRoute('#/zh/friends/ep/1').page, 'notfound');
+  assert.equal(matchRoute('#/vi/ve-nha-di-con/part/3').part, 3);
 });
 
 test('href and matchRoute round-trip for language, show and track pages', () => {
