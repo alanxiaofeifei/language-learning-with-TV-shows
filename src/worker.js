@@ -58,7 +58,7 @@ export async function verifyAccessJwt(token, opts) {
 // Per-user display defaults from env USER_PREFS (JSON object or JSON string: lowercase email -> prefs).
 // Display only, NOT authorization: Access + the JWT check above decide who may read /private/*.
 // The response never contains the email.
-export const DEFAULT_PREFS = Object.freeze({ visibleLangs: null, uiLang: "zh", explainLang: "zh", name: null });
+export const DEFAULT_PREFS = Object.freeze({ visibleLangs: null, hideLangs: Object.freeze(["vi"]), uiLang: "zh", explainLang: "zh", name: null });
 const UI_LANGS = ["zh", "vi"];
 
 function parsePrefsMap(raw) {
@@ -75,6 +75,9 @@ export function prefsFor(email, rawMap) {
   const key = Object.keys(map).find((k) => k.trim().toLowerCase() === want);
   const p = key ? map[key] : null;
   if (!p || typeof p !== "object") return out;
+  if (Array.isArray(p.hideLangs)) {
+    out.hideLangs = p.hideLangs.filter((x) => typeof x === "string" && /^[a-z]{2,3}$/.test(x));
+  }
   if (Array.isArray(p.visibleLangs)) {
     const list = p.visibleLangs.filter((x) => typeof x === "string" && /^[a-z]{2,3}$/.test(x));
     out.visibleLangs = list.length ? list : null;

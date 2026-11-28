@@ -1,3 +1,5 @@
+import { readerLanguages, defaultToggles, explainOf } from "../site/multi.js";
+import { SHOWS } from "../site/lib/catalog.js";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DICT, UI_LANGS, t, setUiLang, pick } from '../site/lib/i18n.js';
@@ -25,6 +27,11 @@ test('i18n: t() switches language, fills vars, falls back to zh', () => {
   assert.equal(t('nav.today'), '今天'); assert.equal(pick({ zh: '中' }, 'vi'), '中');
 });
 
+test('text-only transcript note describes original subtitles in both UI languages', () => {
+  assert.match(DICT.zh['ep.noteText'], /^原文字幕/);
+  assert.match(DICT.vi['ep.noteText'], /^Phụ đề gốc/);
+});
+
 test('prefs: defaults, local overrides, visible languages are display-only filtering', () => {
   assert.deepEqual(normalizeMe(null), DEFAULT_ME);
   const linh = normalizeMe({ visibleLangs: ['zh', 'en', 'NOPE'], uiLang: 'vi', explainLang: 'vi', name: 'Linh' });
@@ -47,4 +54,24 @@ test('fetchMe falls back to defaults on redirect, 403, non-JSON or network failu
   assert.equal((await fetchMe(async () => { throw new TypeError('offline'); })).uiLang, 'zh');
   const ok = await fetchMe(resp(new Response(JSON.stringify({ uiLang: 'vi', explainLang: 'vi', visibleLangs: ['zh'] }), { headers: { 'content-type': 'application/json' } })));
   assert.equal(ok.uiLang, 'vi'); assert.equal(ok.signedIn, true); assert.deepEqual(ok.visibleLangs, ['zh']);
+});
+
+test('reader preferences hide Vietnamese translations and preserve target languages', () => {
+  const alan = effectivePrefs();
+  const linh = effectivePrefs({ hideLangs: [], explainLang: 'vi' });
+  assert.deepEqual(alan.hideLangs, ['vi']);
+  assert.deepEqual(linh.hideLangs, []);
+  assert.deepEqual(normalizeMe({ hideLangs: ['vi', 'BAD', 5, 'abcd'] }).hideLangs, ['vi']);
+
+  const show = SHOWS.friends;
+  assert.deepEqual(readerLanguages(show, alan), ['en', 'zh']);
+  assert.deepEqual(readerLanguages(show, linh), ['en', 'zh', 'vi']);
+  assert.deepEqual(defaultToggles(show, { ...alan, explainLang: 'vi' }), { en: true, zh: true });
+  assert.deepEqual(defaultToggles(show, linh), { en: true, vi: true });
+  assert.deepEqual(readerLanguages(SHOWS.lupin, linh, ['fr', 'zh', 'vi']), ['fr', 'zh']);
+  assert.deepEqual(readerLanguages(SHOWS['ve-nha-di-con'], alan, ['vi', 'zh']), ['vi', 'zh']);
+
+  const card = { meaning_vi: 'vi meaning', explain_vi: 'vi explanation', usage_vi: 'vi usage', explain_zh: 'zh explanation' };
+  assert.deepEqual(explainOf(show, card, { ...alan, explainLang: 'vi' }), { meaning: '', explain: 'zh explanation', usage: '' });
+  assert.deepEqual(explainOf(show, card, linh), { meaning: 'vi meaning', explain: 'vi explanation', usage: 'vi usage' });
 });

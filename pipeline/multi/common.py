@@ -2,7 +2,7 @@
 
 WORKDIR layout (outside Git, e.g. /workspace/tvshows-work/multi/dtt):
   youtube-official: playlist.tsv (idx, youtubeId, durationSec), subs/<id>.{zh-Hans,vi,en}.json3, audio/<id>.m4a
-  text-only:        srt/SxxEyy.en.srt, episodes.json (optional titles)
+  text-only:        srt/SxxEyy.<target>.srt, episodes.json (optional titles)
   gen/<CODE>.lines.json, gen/<CODE>.phrases.json, gen/<CODE>.meta.json, gen/clips/<CODE>/*.mp3
 """
 import glob, json, os, re, sys
@@ -17,6 +17,7 @@ SHOWS = {
         "target": "zh",                       # language being learned
         "langs": ["zh", "py", "vi", "en"],    # line fields available in the reader
         "translate": [],                      # official tracks already cover zh/vi/en
+        "explainLangs": ["zh", "vi"],
         "level": "HSK",                       # HSK 1-6 / 7-9
         "title": {"zh": "都挺好", "en": "All is Well"},
         "srtPrefix": "DouTingHao",
@@ -27,6 +28,7 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "老友记", "en": "Friends"},
         "srtPrefix": "Friends",
@@ -38,6 +40,7 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "宋飞正传", "en": "Seinfeld"},
         "srtPrefix": "Seinfeld",
@@ -49,10 +52,45 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "硅谷", "en": "Silicon Valley"},
         "srtPrefix": "SiliconValley",
         "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。重点关注现代科技和创业公司常用的英语词汇。",
+    },
+    "desperate-housewives": {
+        "source": "text-only",
+        "tvsubtitlesId": 29,
+        "target": "en",
+        "langs": ["en", "zh", "vi"],
+        "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
+        "level": "CEFR",
+        "title": {"zh": "绝望主妇", "en": "Desperate Housewives"},
+        "srtPrefix": "DesperateHousewives",
+        "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。",
+    },
+    "nigeru-wa-haji": {
+        "source": "text-only",
+        "target": "ja",
+        "langs": ["ja", "reading", "zh"],
+        "translate": ["zh"],
+        "explainLangs": ["zh"],
+        "level": "JLPT",
+        "title": {"zh": "逃避虽可耻但有用", "ja": "逃げるは恥だが役に立つ"},
+        "srtPrefix": "Nigeru",
+        "audience": "学习者的母语是中文。用自然的中文讲解现代日常日语，按 JLPT 分级。",
+    },
+    "lupin": {
+        "source": "text-only",
+        "target": "fr",
+        "langs": ["fr", "zh"],
+        "translate": ["zh"],
+        "explainLangs": ["zh"],
+        "level": "CEFR",
+        "title": {"zh": "亚森·罗宾", "fr": "Lupin"},
+        "srtPrefix": "Lupin",
+        "audience": "用自然的中文讲解法国法语，按 CEFR 分级。先打好法国法语基础，魁北克法语差异以后补充。",
     },
 }
 
@@ -76,15 +114,17 @@ def episodes(show_id, work):
                 dur = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else None
                 out.append({"n": n, "code": f"EP{n:02d}", "youtubeId": vid, "duration": dur})
     else:
-        titles = {}
-        meta = os.path.join(work, "episodes.json")
-        if os.path.exists(meta):
-            for e in json.load(open(meta, encoding="utf-8")):
-                titles[e["code"]] = e.get("title", "")
-        codes = sorted(set(titles) | {os.path.basename(p).split(".")[0] for p in glob.glob(os.path.join(work, "srt", "S??E??.en.srt"))})
-        for n, code in enumerate(codes, 1):
-            srt = os.path.join(work, "srt", f"{code}.en.srt")
-            out.append({"n": n, "code": code, "title": titles.get(code, ""), "srt": srt if os.path.exists(srt) else None})
+        target = c["target"]
+        titles = {e["code"]: e.get("title", "") for e in load(os.path.join(work, "episodes.json"), [])}
+        srt_dir = os.path.join(work, "srt")
+        codes = sorted(set(titles) | {
+            os.path.basename(path).split(".")[0]
+            for path in glob.glob(os.path.join(srt_dir, f"S??E??.{target}.srt"))
+        })
+        for code in codes:
+            srt = os.path.join(srt_dir, f"{code}.{target}.srt")
+            if os.path.isfile(srt):
+                out.append({"n": len(out) + 1, "code": code, "title": titles.get(code, ""), "srt": srt})
     return out
 
 def select(eps, only):

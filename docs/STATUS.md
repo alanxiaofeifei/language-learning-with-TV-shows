@@ -1,6 +1,20 @@
 # STATUS
 
-Updated 2026-11-28 12:00 (Asia/Saigon, UTC+7).
+Updated 2026-11-28 19:15 (Asia/Saigon, UTC+7).
+
+## Phase 2 ship (feat/ja-fr-shows)
+Ready languages and shows (private data behind Access, not in Git):
+- Vietnamese: 《回家吧，孩子》 82 parts / 1,239 phrases / 419 clips (unchanged).
+- Chinese: 《都挺好》 46 eps / 37,184 lines / 658 phrases / 658 official-YouTube clips.
+- English (text-only): 《Friends》 S01–S02 48/691; 《Seinfeld》 S01–S02 17/236 (S01E00 has no English subtitle upstream, skipped); 《Silicon Valley》 S01 8/114; 《Desperate Housewives》 S01 22/321 (S01E16 missing upstream, skipped).
+- Japanese (text-only): 《逃げるは恥だが役に立つ》 S01 11/164 (zh translations only).
+- French (text-only, France French baseline): 《Lupin》 Part 1 5/75 (zh translations only). Spanish and Cantonese stay placeholders.
+
+Per-user display (secret `USER_PREFS`, emails not in Git): Alan / defaults hide Vietnamese translations (`hideLangs: ["vi"]`); Linh sees Vietnamese translations on Chinese and English shows (`hideLangs: []`, visible languages zh+en, Vietnamese UI). Display only, not authorization.
+
+LLM: `pipeline/llm.py` uses subscription CLIs by default (Claude Code `haiku`, Codex `gpt-6-luna`, rotating on rate limits). Paid DeepSeek/GLM APIs are off unless `LLM_ALLOW_PAID=1`. Phase-2 translation/phrases after the switch used the CLIs.
+
+Review: Antigravity `agy --mode plan --model gemini-4-argon-high` on this batch found 0 blockers / 0 majors (review5); remaining minors were fixed in `54361cc`. `npm test` 47/47; `scripts/check-no-private.sh` ok.
 
 ## Multi-language pilot (feat/multilang-pilot)
 - Ready languages: Vietnamese (回家吧，孩子), Chinese 《都挺好》 (official 正午阳光 YouTube, 46 eps: zh/pinyin/vi/en lines, 658 phrases with original-audio clips, bilingual SRTs) and English 《Friends》 S01–S02 (text mode: 48 eps, zh+vi translations, 691 phrases, no audio; timings are approximate). fr/ja/es/yue stay placeholders with planned picks.

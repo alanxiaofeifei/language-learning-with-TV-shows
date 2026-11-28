@@ -1,4 +1,4 @@
-// Views for generic shows (kind "multi": 都挺好, Friends). Data: public episode list under
+// Views for generic shows (kind "multi"). Data: public episode list under
 // /shows/<id>/episodes.json, private lines/phrases under /private/shows/<id>/ (Access + Worker JWT).
 import { h, fmt, titleEl, progressBar } from "./lib/dom.js";
 import { SHOWS, href } from "./lib/catalog.js";
@@ -6,7 +6,9 @@ import { t, pick, uiLang } from "./lib/i18n.js";
 import { buildShowDays, nextShowDay, SHORT_WEEKS, LONG_OUTLINES, SHORT_DAYS } from "./lib/show-curriculum.js";
 import { review, queue, today } from "./lib/srs.js";
 
-let env = { rerender: () => {}, prefs: () => ({ uiLang: "zh", explainLang: "zh" }) };
+import { DEFAULT_ME } from "./lib/prefs.js";
+
+let env = { rerender: () => {}, prefs: () => DEFAULT_ME };
 export function initMulti(e) { env = { ...env, ...e }; }
 
 // ---- per-show state (localStorage, keyed per show) ----
@@ -101,16 +103,22 @@ function watchPanel(show) {
   return h("section", { class: "panel notice reveal" },
     h("p", {}, t("show.textOnly")),
     show.watch ? h("div", { class: "actions" },
-      h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, `${t("show.watchOwn")} · ${show.watch.name}`)) : null,
+      h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, `${t("show.watchOwn")} · ${show.watch.name}`)) : h("p", {}, t("show.watchOwn")),
     h("p", { class: "muted" }, t("show.timesApprox")));
 }
-function explainOf(p) {
-  const L = env.prefs().explainLang === "vi" ? "vi" : "zh";
-  const other = L === "vi" ? "zh" : "vi";
+export function readerLanguages(show, prefs, available = show.langs ?? [show.language]) {
+  const hidden = prefs.hideLangs ?? DEFAULT_ME.hideLangs;
+  return available.filter((k) => k === show.language || ((show.langs ?? available).includes(k) && !hidden.includes(k)));
+}
+export function explainOf(show, p, prefs) {
+  const allowed = readerLanguages(show, prefs);
+  const preferred = prefs.explainLang === "vi" ? "vi" : "zh";
+  const other = preferred === "vi" ? "zh" : "vi";
+  const field = (key, langs) => langs.filter((k) => allowed.includes(k)).map((k) => p[`${key}_${k}`]).find(Boolean) || "";
   return {
-    meaning: p[`meaning_${L}`] || p.meaning_en || p[`meaning_${other}`] || "",
-    explain: p[`explain_${L}`] || p[`explain_${other}`] || "",
-    usage: p[`usage_${L}`] || p[`usage_${other}`] || "",
+    meaning: field("meaning", [preferred, "en", other]),
+    explain: field("explain", [preferred, other]),
+    usage: field("usage", [preferred, other]),
   };
 }
 
@@ -129,7 +137,7 @@ function timeLink(show, ep, ms) {
 }
 function sourceLines(show, p) {
   const lt = p.lineText || {};
-  return (show.langs || []).filter((k) => lt[k]).map((k) => h("p", { class: "line l-" + k }, lt[k]));
+  return readerLanguages(show, env.prefs()).filter((k) => lt[k]).map((k) => h("p", { class: "line l-" + k }, lt[k]));
 }
 function setFlipped(card, front, back, flipped) {
   card.classList.toggle("is-flipped", flipped);
@@ -137,11 +145,11 @@ function setFlipped(card, front, back, flipped) {
   (flipped ? back : front).querySelector("button, a")?.focus();
 }
 function phraseCard(show, p, ep) {
-  const x = explainOf(p);
+  const x = explainOf(show, p, env.prefs());
   const front = h("div", { class: "face front" },
     h("div", { class: "card-top" }, p.level ? h("span", { class: "tag level" }, p.level) : null, h("span", { class: "tag" }, t("card.at", { ep: isYt(show) ? t("ep.title", { n: p.ep }) : p.code, t: fmt(p.start) }))),
     h("p", { class: "vi phrase-" + show.language }, p.phrase),
-    p.py ? h("p", { class: "reading" }, p.py) : null,
+    (p.py || p.reading) ? h("p", { class: "reading" }, p.py || p.reading) : null,
     h("div", { class: "actions" }, ...clipButtons(p),
       h("button", { class: "btn primary", type: "button", onclick: (e) => { e.stopPropagation(); setFlipped(card, front, back, true); } }, t("card.show"))),
     h("p", { class: "flip-hint" }, t("card.hint")));
@@ -161,12 +169,16 @@ function phraseCard(show, p, ep) {
 async function viewShow(show) {
   const st = store(show.id);
   await Promise.all([loadPublic(show), loadIndex(show)]);
-  const next = (LONG_OUTLINES[show.language] || []).filter((s) => s.status !== "now").map((s) => s.show).join(" → ");
+  const stages = LONG_OUTLINES[show.language] || [];
+  const next = stages.filter((s) => s.status === "planned").map((s) => uiLang() === "vi" ? s.showVi || s.show : s.show).join(" → ");
+  const techStage = show.id === "silicon-valley" && stages.find((s) => s.showId === show.id);
+  const subtitle = [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · ");
   return [
     h("section", { class: "hero reveal" },
       h("p", { class: "eyebrow" }, [channelName(show), show.year].filter(Boolean).join(" · ")),
       titleEl(showTitle(show)),
-      h("p", { class: "lede" }, [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · "))),
+      subtitle ? h("p", { class: "lede" }, subtitle) : null,
+      techStage ? h("p", {}, pick(techStage.goal)) : null),
     h("div", { class: "track-grid" },
       h("a", { class: "track-card reveal", href: go(show, { page: "track", track: "short" }), "data-tilt": "1" },
         h("p", { class: "length" }, t("track.shortLength")), h("h2", {}, t("track.short")),
@@ -174,7 +186,7 @@ async function viewShow(show) {
         progressBar(st.doneDays.length, SHORT_DAYS), h("p", { class: "muted" }, t("show.progressDays", { d: st.doneDays.length }))),
       h("a", { class: "track-card long reveal", href: go(show, { page: "track", track: "long" }), "data-tilt": "1" },
         h("p", { class: "length" }, t("track.longLength")), h("h2", {}, t("track.long")),
-        h("p", {}, t("show.longBlurb", { next })))),
+        h("p", {}, show.language === "en" ? t("show.longBlurbEn") : t("show.longBlurb", { next })))),
     watchPanel(show),
     episodeList(show),
   ];
@@ -196,12 +208,14 @@ async function viewEpisodes(show) {
   return [h("h1", { class: "reveal" }, `${showTitle(show)} · ${t("show.episodes")}`), watchPanel(show), episodeList(show)];
 }
 
-function defaultToggles(show) {
-  const ex = env.prefs().explainLang;
+export function defaultToggles(show, prefs, langs = readerLanguages(show, prefs)) {
+  const ex = prefs.explainLang;
   const on = { [show.language]: true };
-  if (show.langs.includes("py")) on.py = true;
-  if (show.language !== ex && show.langs.includes(ex)) on[ex] = true;
-  else if (show.langs.includes("en") && show.language !== "en") on.en = true;
+  if (langs.includes("py")) on.py = true;
+  if (langs.includes("reading")) on.reading = true;
+  if (show.language !== ex && langs.includes(ex)) on[ex] = true;
+  else if (ex === "vi" && !langs.includes(ex) && show.language !== "zh" && langs.includes("zh")) on.zh = true;
+  else if (langs.includes("en") && show.language !== "en") on.en = true;
   return on;
 }
 
@@ -212,15 +226,17 @@ function episodeBlock(show, n, idx, { compact = false } = {}) {
   if (!e) return [h("p", { class: "reveal" }, t("ep.notFound"))];
   const phrases = idx.phrases.filter((p) => p.ep === n);
   const watched = !!st.watched[n];
+  const langs = readerLanguages(show, env.prefs());
   return [h("section", { class: "panel reveal" },
     h("h2", {}, `${showTitle(show)} · ${epLabel(show, e)}`),
     h("p", { class: "muted" }, [e.duration ? t("ep.minutes", { m: Math.round(e.duration / 60) }) : null, e.lines ? t("ep.lines", { n: e.lines }) : null, t("ep.phrases", { n: phrases.length })].filter(Boolean).join(" · ")),
     h("div", { class: "actions" },
       e.youtubeId ? h("a", { class: "btn primary", href: ytUrl(e.youtubeId), target: "_blank", rel: "noopener" }, t("show.watchYoutube")) : null,
       !isYt(show) && show.watch ? h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, t("show.watchOwn")) : null,
-      ...(e.srt || []).map((s) => h("a", { class: "btn", href: s.href, download: s.href.split("/").pop() }, t("ep.srt", { pair: s.langs.map((k) => t("langname." + k)).join("+") }))),
+      ...(e.srt || []).filter((s) => s.langs.every((k) => langs.includes(k))).map((s) => h("a", { class: "btn", href: s.href, download: s.href.split("/").pop() }, t("ep.srt", { pair: s.langs.map((k) => t("langname." + k)).join("+") }))),
       compact ? h("a", { class: "btn ghost", href: go(show, { page: "ep", ep: n }) }, t("ep.transcript")) : null,
       h("button", { class: "btn ghost", type: "button", onclick: () => { st.watched[n] = !watched; persist(show.id); env.rerender({ transition: false, preserveScroll: true }); } }, watched ? t("ep.watched") : t("ep.markWatched"))),
+    !isYt(show) && !show.watch ? h("p", {}, t("show.watchOwn")) : null,
     !isYt(show) ? h("p", { class: "muted" }, t("show.timesApprox")) : null,
     phrases.length ? h("h3", { class: "section-title" }, t("ep.phrases", { n: phrases.length })) : null,
     h("div", { class: "cards" }, phrases.map((p) => phraseCard(show, p, e))))];
@@ -239,8 +255,9 @@ async function viewEp(show, n) {
   let data;
   try { data = await loadEp(show, e); } catch { return [...out, h("p", { class: "muted reveal" }, t("login.error")), nav]; }
   const st = store(show.id);
-  const langs = data.langs || show.langs;
-  const tog = { ...defaultToggles(show), ...(st.toggles || {}) };
+  const prefs = env.prefs();
+  const langs = readerLanguages(show, prefs, data.langs || show.langs);
+  const tog = { ...defaultToggles(show, prefs, langs), ...(st.toggles || {}) };
   const list = h("ol", { class: "transcript multi" });
   const applyToggles = () => {
     langs.forEach((k) => list.classList.toggle("hide-" + k, !tog[k]));
@@ -256,7 +273,7 @@ async function viewEp(show, n) {
     const ts = isYt(show) && e.youtubeId
       ? h("a", { class: "ts", href: ytUrl(e.youtubeId, L.start), target: "_blank", rel: "noopener" }, fmt(L.start))
       : h("span", { class: "ts", title: t("show.timesApprox") }, fmt(L.start));
-    list.append(h("li", { "data-langs": langs.filter((k) => L[k]).join(" ") }, ts, h("div", { class: "stack" }, langs.filter((k) => L[k]).map((k) => h("span", { class: "l-" + k, lang: k === "py" ? "zh-Latn-pinyin" : k }, L[k])))));
+    list.append(h("li", { "data-langs": langs.filter((k) => L[k]).join(" ") }, ts, h("div", { class: "stack" }, langs.filter((k) => L[k]).map((k) => h("span", { class: "l-" + k, lang: k === "py" ? "zh-Latn-pinyin" : k === "reading" ? "ja-Hira" : k }, L[k])))));
   }
   applyToggles();
   out.push(h("section", { class: "panel reveal" }, h("h2", {}, t("ep.transcript")),
@@ -335,10 +352,10 @@ function viewPlan(show) {
 function viewLong(show) {
   const stages = LONG_OUTLINES[show.language] || [];
   return [
-    h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t("long.lede"))),
+    h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t(show.language === "en" ? "show.longBlurbEn" : "long.lede"))),
     h("div", { class: "stage-list" }, stages.map((s) => h("section", { class: "panel stage-card reveal" + (s.status === "now" ? " now" : "") },
       h("p", { class: "eyebrow" }, `${pick(s.span)} · ${s.status === "now" ? t("long.now") : t("long.planned")}`),
-      h("h2", {}, s.status === "now" ? h("a", { href: go(show, { page: "track", track: "short" }) }, s.show) : s.show),
+      h("h2", {}, s.status === "now" ? h("a", { href: go(SHOWS[s.showId || show.id], { page: "track", track: "short" }) }, s.show) : uiLang() === "vi" ? s.showVi || s.show : s.show),
       h("p", {}, pick(s.goal))))),
   ];
 }
@@ -376,9 +393,9 @@ async function viewReview(show) {
   if (!id) return [...wrap, h("section", { class: "panel reveal" }, h("p", {}, t("review.empty")), h("a", { class: "btn", href: go(show, { page: "track", track: multiTrack(show.id) }) }, t("review.backTrack")))];
   const p = idx.phrases.find((x) => x.id === id);
   const e = epList(show).find((x) => x.n === p.ep);
-  const isNew = !st.srs[id]; const x = explainOf(p);
+  const isNew = !st.srs[id]; const x = explainOf(show, p, env.prefs());
   const back = h("div", { class: "back", hidden: true },
-    h("p", { class: "vi" }, p.phrase), p.py ? h("p", { class: "reading" }, p.py) : null,
+    h("p", { class: "vi" }, p.phrase), (p.py || p.reading) ? h("p", { class: "reading" }, p.py || p.reading) : null,
     x.meaning ? h("p", { class: "zh" }, h("b", {}, x.meaning)) : null, x.explain ? h("p", { class: "usage" }, x.explain) : null,
     ...sourceLines(show, p), h("div", { class: "actions" }, timeLink(show, e, p.start)),
     h("div", { class: "actions grades" }, ["again", "hard", "good", "easy"].map((g) =>

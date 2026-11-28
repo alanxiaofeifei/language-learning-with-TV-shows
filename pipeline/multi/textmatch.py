@@ -1,14 +1,24 @@
 """Phrase <-> source-line matching for extract_phrases_multi.py (pure functions, no I/O)."""
 import re
+import unicodedata
 
 _ZH_DROP = re.compile(r"[\s，。！？、,.!?…\"'“”‘’]")
 
-def norm(s, zh):
-    """zh: drop spaces and punctuation. Other: lowercase, curly -> straight apostrophe,
+def norm(s, zh, language=None):
+    """ja: normalize width and drop spaces, punctuation and symbols.
+    zh: drop spaces and punctuation. Other: lowercase, curly -> straight apostrophe,
     every other non [a-z0-9'] char becomes a space, runs of spaces collapse to one."""
     s = s or ""
+    if language == "ja":
+        return "".join(ch for ch in unicodedata.normalize("NFKC", s)
+                       if not ch.isspace() and not unicodedata.category(ch).startswith(("P", "S")))
+    if language == "fr":
+        folded = unicodedata.normalize("NFKD", s.casefold())
+        s = "".join(ch for ch in folded if not unicodedata.category(ch).startswith("M")).replace("œ", "oe").replace("æ", "ae")
     if zh: return _ZH_DROP.sub("", s)
     s = s.lower().replace("\u2019", "'").replace("\u2018", "'")
+    if language == "fr":
+        s = s.replace("'", " ")
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9' ]", " ", s)).strip()
 
 def matches(key, line_norm, zh):

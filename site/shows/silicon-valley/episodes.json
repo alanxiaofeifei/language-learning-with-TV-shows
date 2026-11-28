@@ -1,0 +1,46 @@
+{
+ "show": "silicon-valley",
+ "source": "text-only",
+ "episodes": [
+  {
+   "n": 1,
+   "code": "S01E01",
+   "title": "Minimum Viable Product"
+  },
+  {
+   "n": 2,
+   "code": "S01E02",
+   "title": "The Cap Table"
+  },
+  {
+   "n": 3,
+   "code": "S01E03",
+   "title": "Articles of Incorporation"
+  },
+  {
+   "n": 4,
+   "code": "S01E04",
+   "title": "Fiduciary Duties"
+  },
+  {
+   "n": 5,
+   "code": "S01E05",
+   "title": "Signaling Risk"
+  },
+  {
+   "n": 6,
+   "code": "S01E06",
+   "title": "Third Party Insourcing"
+  },
+  {
+   "n": 7,
+   "code": "S01E07",
+   "title": "Proof of Concept"
+  },
+  {
+   "n": 8,
+   "code": "S01E08",
+   "title": "Optimal Tip-to-Tip Efficiency"
+  }
+ ]
+}
