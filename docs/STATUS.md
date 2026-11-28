@@ -1,6 +1,6 @@
 # STATUS
 
-Updated 2026-11-28 19:15 (Asia/Saigon, UTC+7).
+Updated 2026-11-28 19:20 (Asia/Saigon, UTC+7).
 
 ## Phase 2 ship (feat/ja-fr-shows)
 Ready languages and shows (private data behind Access, not in Git):
@@ -15,6 +15,9 @@ Per-user display (secret `USER_PREFS`, emails not in Git): Alan / defaults hide 
 LLM: `pipeline/llm.py` uses subscription CLIs by default (Claude Code `haiku`, Codex `gpt-6-luna`, rotating on rate limits). Paid DeepSeek/GLM APIs are off unless `LLM_ALLOW_PAID=1`. Phase-2 translation/phrases after the switch used the CLIs.
 
 Review: Antigravity `agy --mode plan --model gemini-4-argon-high` on this batch found 0 blockers / 0 majors (review5); remaining minors were fixed in `54361cc`. `npm test` 47/47; `scripts/check-no-private.sh` ok.
+
+## Deploy record (2026-11-28 19:20 Asia/Saigon, UTC+7)
+- Merged PR #3 (`06be58d`). Preview Worker version `93b705fe-d67f-46e8-b1d5-a1070bf28d27`; production `2a325dfc-98ae-4593-b6aa-2132ce0231b2`. `USER_PREFS` secret updated on both (Alan hides vi translations; Linh does not). Anonymous `/` 200; `/private`, `/private/me.json`, `/private/shows/*` → 302 Access login on both hosts. Owner/Linh logged-in views not testable from this box.
 
 ## Multi-language pilot (feat/multilang-pilot)
 - Ready languages: Vietnamese (回家吧，孩子), Chinese 《都挺好》 (official 正午阳光 YouTube, 46 eps: zh/pinyin/vi/en lines, 658 phrases with original-audio clips, bilingual SRTs) and English 《Friends》 S01–S02 (text mode: 48 eps, zh+vi translations, 691 phrases, no audio; timings are approximate). fr/ja/es/yue stay placeholders with planned picks.
