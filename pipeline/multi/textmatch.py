@@ -16,6 +16,8 @@ def norm(s, zh, language=None):
         s = "".join(ch for ch in folded if not unicodedata.category(ch).startswith("M")).replace("œ", "oe").replace("æ", "ae")
     if zh: return _ZH_DROP.sub("", s)
     s = s.lower().replace("\u2019", "'").replace("\u2018", "'")
+    if language == "fr":
+        s = s.replace("'", " ")
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9' ]", " ", s)).strip()
 
 def matches(key, line_norm, zh):

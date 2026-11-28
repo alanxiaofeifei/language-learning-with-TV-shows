@@ -39,6 +39,18 @@ class Addic7ed(unittest.TestCase):
         self.assertIsNone(page.subtitle("ja"))
         self.assertIsNone(fetcher.EpisodePage(IN_PROGRESS, SEASON).subtitle("fr"))
 
+    def test_shared_table_rows_and_numeric_episode_selector(self):
+        english = '<tr><td>English</td><td>Completed</td><td><a href="/original/en">Original</a></td></tr>'
+        french = '<tr><td>French</td><td>Completed</td><td><a href="/original/fr">Original</a></td></tr>'
+        spanish = '<tr><td>Spanish</td><td>Completed</td><td><a href="/original/es">Original</a></td></tr>'
+        draft = '<tr><td>French</td><td>In progress</td></tr>'
+        navigation = '<select id="qsEp"><option value="2">2 - Next Episode</option></select>'
+        page = fetcher.EpisodePage(f"{navigation}<table>{english}{french}</table>", SEASON)
+        self.assertEqual(page.subtitle("fr"), "/original/fr")
+        self.assertEqual(page.subtitle("en"), "/original/en")
+        self.assertEqual(page.episodes[2], (f"{SEASON}/2/Next_Episode", "Next Episode"))
+        self.assertIsNone(fetcher.EpisodePage(f"<table>{spanish}{draft}</table>", SEASON).subtitle("fr"))
+
     def test_fetch_is_idempotent_and_keeps_episode_titles(self):
         path1 = f"{SEASON}/1"
         path2 = f"{SEASON}/2/Next_Episode"

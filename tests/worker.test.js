@@ -47,16 +47,20 @@ test('verifyAccess returns the payload only for a valid token', async () => {
 
 test('prefsFor maps lowercase emails, ignores junk and defaults unknown users', () => {
   const map = JSON.stringify({
-    'linh@example.test': { visibleLangs: ['zh', 'en', 'BAD!', 7], uiLang: 'vi', explainLang: 'vi', name: 'Linh' },
+    'linh@example.test': { visibleLangs: ['zh', 'en', 'BAD!', 7], hideLangs: [], uiLang: 'vi', explainLang: 'vi', name: 'Linh' },
     'Mixed@Example.Test': { uiLang: 'xx', name: 'who@example.test' },
   });
-  assert.deepEqual(prefsFor('LINH@example.test', map), { visibleLangs: ['zh', 'en'], uiLang: 'vi', explainLang: 'vi', name: 'Linh' });
+  assert.deepEqual(prefsFor('LINH@example.test', map), { visibleLangs: ['zh', 'en'], hideLangs: [], uiLang: 'vi', explainLang: 'vi', name: 'Linh' });
   assert.deepEqual(prefsFor('mixed@example.test', map), DEFAULT_PREFS);
   assert.deepEqual(prefsFor('stranger@example.test', map), DEFAULT_PREFS);
   assert.deepEqual(prefsFor(undefined, map), DEFAULT_PREFS);
   assert.deepEqual(prefsFor('linh@example.test', 'not json'), DEFAULT_PREFS);
   assert.deepEqual(prefsFor('linh@example.test', { 'linh@example.test': { uiLang: 'vi' } }).uiLang, 'vi');
   assert.equal(DEFAULT_PREFS.visibleLangs, null);
+  assert.deepEqual(DEFAULT_PREFS.hideLangs, ['vi']);
+  assert.deepEqual(prefsFor('alan@example.test', {
+    'alan@example.test': { hideLangs: ['vi', 'eng', 'BAD', 7, 'x', 'long'] },
+  }).hideLangs, ['vi', 'eng']);
 });
 
 async function meEnv(prefs) {
@@ -74,7 +78,7 @@ async function meEnv(prefs) {
 
 test('GET /private/me.json returns prefs for the signed-in user, never the email', async () => {
   const realFetch = globalThis.fetch;
-  const prefs = JSON.stringify({ 'linh@example.test': { visibleLangs: ['zh', 'en'], uiLang: 'vi', explainLang: 'vi', name: 'Linh' } });
+  const prefs = JSON.stringify({ 'linh@example.test': { visibleLangs: ['zh', 'en'], hideLangs: [], uiLang: 'vi', explainLang: 'vi', name: 'Linh' } });
   const m = await meEnv(prefs);
   // Stub the JWKS fetch the Worker makes to the Access team domain.
   globalThis.fetch = async (u) => {
@@ -88,12 +92,12 @@ test('GET /private/me.json returns prefs for the signed-in user, never the email
     assert.equal(r.headers.get('Cache-Control'), 'no-store');
     const text = await r.text();
     assert.ok(!text.includes('@'), 'no email in body');
-    assert.deepEqual(JSON.parse(text), { visibleLangs: ['zh', 'en'], uiLang: 'vi', explainLang: 'vi', name: 'Linh' });
+    assert.deepEqual(JSON.parse(text), { visibleLangs: ['zh', 'en'], hideLangs: [], uiLang: 'vi', explainLang: 'vi', name: 'Linh' });
 
     const unknown = await call('nobody@example.test');
     const body = await unknown.text();
     assert.ok(!body.includes('@'));
-    assert.deepEqual(JSON.parse(body), { visibleLangs: null, uiLang: 'zh', explainLang: 'zh', name: null });
+    assert.deepEqual(JSON.parse(body), { visibleLangs: null, hideLangs: ['vi'], uiLang: 'zh', explainLang: 'zh', name: null });
 
     const anon = await call(null);
     assert.equal(anon.status, 403);

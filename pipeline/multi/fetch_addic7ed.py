@@ -25,7 +25,7 @@ class EpisodePage(HTMLParser):
         super().__init__()
         self.season_path = season_path
         self.episodes = {}
-        self.tables = []
+        self.containers = []
         self.blocks = []
         self.option = None
         self.episode_select = False
@@ -44,24 +44,25 @@ class EpisodePage(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if tag == "select":
-            self.episode_select = any("episode" in (attrs.get(k) or "").lower() for k in ("name", "id"))
+            self.episode_select = any("episode" in value or value == "qsep"
+                                      for value in ((attrs.get(k) or "").lower() for k in ("name", "id")))
         if tag == "option" and self.episode_select:
             self.option = (attrs.get("value") or "", [])
-        if tag == "table":
-            self.tables.append({"text": [], "links": [], "has_blocks": False})
+        if tag in ("table", "tr"):
+            self.containers.append({"tag": tag, "text": [], "links": [], "has_blocks": False})
         if tag in ("a", "option"):
             value = attrs.get("href" if tag == "a" else "value") or ""
             self.episode_link(value)
-            if re.fullmatch(r"/original/[^\s?#]+", value) and self.tables:
-                for table in self.tables:
-                    table["links"].append(value)
+            if re.fullmatch(r"/original/[^\s?#]+", value):
+                for block in self.containers:
+                    block["links"].append(value)
 
     def handle_data(self, data):
         if self.option is not None:
             self.option[1].append(data)
         if data.strip():
-            for table in self.tables:
-                table["text"].append(data.strip())
+            for block in self.containers:
+                block["text"].append(data.strip())
 
     def handle_endtag(self, tag):
         if tag == "select":
@@ -73,16 +74,21 @@ class EpisodePage(HTMLParser):
                 title = re.sub(r"^\s*\d+\s*[-.]\s*", "", "".join(parts)).strip()
                 if title:
                     self.episodes[int(value)] = (f"{self.season_path}/{value}/{title.replace(' ', '_')}", title)
-        if tag == "table" and self.tables:
-            block = self.tables.pop()
-            if block["has_blocks"]:
-                return
-            text = {part.casefold() for part in block["text"]}
-            languages = text & LANGUAGE_NAMES.keys()
-            if len(languages) == 1 and "completed" in text and block["links"]:
-                self.blocks.append((LANGUAGE_NAMES[languages.pop()], block["links"][0]))
-                for table in self.tables:
-                    table["has_blocks"] = True
+        if not self.containers or tag != self.containers[-1]["tag"]:
+            return
+        block = self.containers.pop()
+        if block["has_blocks"] or block.get("has_language_rows"):
+            return
+        text = {part.casefold() for part in block["text"]}
+        languages = text & LANGUAGE_NAMES.keys()
+        if len(languages) == 1 and "completed" in text and block["links"]:
+            self.blocks.append((LANGUAGE_NAMES[languages.pop()], block["links"][0]))
+            for parent in self.containers:
+                parent["has_blocks"] = True
+        elif tag == "tr" and self.containers and languages and text & {"completed", "in progress"}:
+            # A language row with its own status cannot borrow another row's link.
+            for parent in self.containers:
+                parent["has_language_rows"] = True
 
     def subtitle(self, language):
         return next((link for code, link in self.blocks if code == language), None)

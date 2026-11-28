@@ -17,6 +17,7 @@ SHOWS = {
         "target": "zh",                       # language being learned
         "langs": ["zh", "py", "vi", "en"],    # line fields available in the reader
         "translate": [],                      # official tracks already cover zh/vi/en
+        "explainLangs": ["zh", "vi"],
         "level": "HSK",                       # HSK 1-6 / 7-9
         "title": {"zh": "都挺好", "en": "All is Well"},
         "srtPrefix": "DouTingHao",
@@ -27,6 +28,7 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "老友记", "en": "Friends"},
         "srtPrefix": "Friends",
@@ -38,6 +40,7 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "宋飞正传", "en": "Seinfeld"},
         "srtPrefix": "Seinfeld",
@@ -49,6 +52,7 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "硅谷", "en": "Silicon Valley"},
         "srtPrefix": "SiliconValley",
@@ -60,6 +64,7 @@ SHOWS = {
         "target": "en",
         "langs": ["en", "zh", "vi"],
         "translate": ["zh", "vi"],
+        "explainLangs": ["zh", "vi"],
         "level": "CEFR",
         "title": {"zh": "绝望主妇", "en": "Desperate Housewives"},
         "srtPrefix": "DesperateHousewives",
@@ -68,22 +73,24 @@ SHOWS = {
     "nigeru-wa-haji": {
         "source": "text-only",
         "target": "ja",
-        "langs": ["ja", "reading", "zh", "vi"],
-        "translate": ["zh", "vi"],
+        "langs": ["ja", "reading", "zh"],
+        "translate": ["zh"],
+        "explainLangs": ["zh"],
         "level": "JLPT",
         "title": {"zh": "逃避虽可耻但有用", "ja": "逃げるは恥だが役に立つ"},
         "srtPrefix": "Nigeru",
-        "audience": "Alan 的母语是中文，Linh 的母语是越南语。用自然的中文和北越越南语讲解现代日常日语，按 JLPT 分级。",
+        "audience": "学习者的母语是中文。用自然的中文讲解现代日常日语，按 JLPT 分级。",
     },
     "lupin": {
         "source": "text-only",
         "target": "fr",
-        "langs": ["fr", "zh", "vi"],
-        "translate": ["zh", "vi"],
+        "langs": ["fr", "zh"],
+        "translate": ["zh"],
+        "explainLangs": ["zh"],
         "level": "CEFR",
         "title": {"zh": "亚森·罗宾", "fr": "Lupin"},
         "srtPrefix": "Lupin",
-        "audience": "用自然的中文和北越越南语讲解法国法语，按 CEFR 分级。先打好法国法语基础，魁北克法语差异以后补充。",
+        "audience": "用自然的中文讲解法国法语，按 CEFR 分级。先打好法国法语基础，魁北克法语差异以后补充。",
     },
 }
 

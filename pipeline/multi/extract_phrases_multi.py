@@ -1,4 +1,4 @@
-"""Pick ~15 useful phrases per episode with level + bilingual (zh/vi) explanations.
+"""Pick ~15 useful phrases per episode with level + configured explanation languages.
 
 Usage: python pipeline/multi/extract_phrases_multi.py SHOW_ID WORKDIR [--only EP01] [--n 15] [--force]
 Writes gen/<CODE>.phrases.json. Skips episodes that already have one unless --force.
@@ -19,25 +19,33 @@ def system(c, n):
     if c["target"] == "zh":
         what = ("从中文字幕里挑出最值得学的词语、固定搭配、口语句式或成语（2–12 个汉字，从原句里原样截取）。"
                 "level 用新 HSK 等级：HSK1…HSK6 或 HSK7-9（取该表达整体的难度）。优先 HSK4 以上、考试和日常都常用的；避开人名和剧情专有词。")
-        meaning = '"meaning_vi":"越南语意思","meaning_en":"English gloss"'
     elif c["target"] in ("ja", "fr"):
         japanese = c["target"] == "ja"
         example = "日语" if japanese else "法语"
         level = "JLPT：N5/N4/N3/N2/N1" if japanese else "CEFR：A1/A2/B1/B2/C1/C2"
         what = (f"从{example}字幕里原样截取实用的日常口语表达、固定搭配或句式。"
                 f"level 用 {level}，按整个表达的难度分级。避开人名和剧情专有词。")
-        meaning = '"meaning_zh":"中文意思","meaning_vi":"越南语意思"'
         if japanese:
             reading = '"reading":"短语在原句中的读法，使用平假名",'
     else:
         what = ("从英文字幕里挑出最值得学的口语表达、短语动词、习语或句式（1–8 个词，从原句里原样截取）。"
                 "level 用 CEFR：A2/B1/B2/C1/C2。优先地道、高频、能离开剧情直接用的；粗口、人名、剧情专有内容不要。")
-        meaning = '"meaning_zh":"中文意思","meaning_vi":"越南语意思"'
+    meanings = {"zh": "中文意思", "vi": "越南语意思", "en": "English gloss"}
+    meaning = ",".join(f'"meaning_{k}":"{meanings[k]}"' for k in meaning_langs(c))
+    fields = {
+        "explain_vi": "越南语讲解：意思、语气、和近义说法的区别（1–2 句）",
+        "explain_zh": "中文讲解（1 句）",
+        "usage_vi": f"越南语：什么场合用 + 一个自编新例句（附{example}原文）",
+        "usage_zh": "中文：什么场合用 + 一个自编新例句",
+    }
+    explanations = ",".join(f'"{k}":"{v}"' for k, v in fields.items() if k.split("_")[1] in c["explainLangs"])
     return (f"你是语言老师。{c['audience']}\n{what}\n挑 {n} 条，按出现顺序，不要重复。每条输出："
-            f'{{"idx":字幕行号,"phrase":"原文片段","level":"…",{meaning},{reading}'
-            '"explain_vi":"越南语讲解：意思、语气、和近义说法的区别（1–2 句）","explain_zh":"中文讲解（1 句）",'
-            f'"usage_vi":"越南语：什么场合用 + 一个自编新例句（附{example}原文）","usage_zh":"中文：什么场合用 + 一个自编新例句"}}。'
+            f'{{"idx":字幕行号,"phrase":"原文片段","level":"…",{meaning},{reading}{explanations}}}。'
             '例句必须自编，不能抄剧中台词。只输出 JSON {"phrases":[...]}。')
+
+def meaning_langs(c):
+    langs = [k for k in c["explainLangs"] if k != c["target"]]
+    return langs + ["en"] if c["target"] == "zh" else langs
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("show"); ap.add_argument("work")
@@ -73,11 +81,14 @@ def main():
             lv = str(p.get("level", "")).upper().replace(" ", "")
             lv = next((x for x in LEVELS[c["level"]] if x.upper() == lv), None) or ("HSK7-9" if zh and lv.startswith("HSK7") else None)
             card = {"id": f"{ep['code'].lower()}-{len(res) + 1:02d}", "ep": ep["n"], "code": ep["code"], "line": hit,
-                    "start": L["start"], "end": L["end"], "phrase": phrase, "level": lv,
-                    "explain_zh": (p.get("explain_zh") or "").strip(), "explain_vi": (p.get("explain_vi") or "").strip(),
-                    "usage_zh": (p.get("usage_zh") or "").strip(), "usage_vi": (p.get("usage_vi") or "").strip()}
-            for k in ("meaning_zh", "meaning_vi", "meaning_en"):
-                if p.get(k): card[k] = str(p[k]).strip()
+                    "start": L["start"], "end": L["end"], "phrase": phrase, "level": lv}
+            for field in ("explain", "usage"):
+                for lang in c["explainLangs"]:
+                    key = f"{field}_{lang}"
+                    card[key] = (p.get(key) or "").strip()
+            for lang in ("zh", "vi", "en") if "vi" in c["explainLangs"] else meaning_langs(c):
+                key = f"meaning_{lang}"
+                if p.get(key): card[key] = str(p[key]).strip()
             if zh: card["py"] = pinyin(phrase)
             if src == "ja" and isinstance(p.get("reading"), str):
                 card["reading"] = p["reading"].strip()

@@ -29,8 +29,8 @@ def main():
     ap.add_argument("--only"); ap.add_argument("--langs"); ap.add_argument("--batch", type=int, default=80); a = ap.parse_args()
     c = cfg(a.show)
     langs = [x for x in (a.langs.split(",") if a.langs else c["translate"]) if x]
-    if c["target"] in SOURCE_NAMES and any(k not in c["translate"] for k in langs):
-        ap.error("Japanese and French shows support only zh and vi translations")
+    if any(k not in c["translate"] for k in langs):
+        ap.error(f"{a.show} supports translation only into: {', '.join(c['translate']) or 'none'}")
     if not langs: print(json.dumps({"note": "nothing to translate for " + a.show})); return
     src = c["target"]; gen = gen_dir(a.work); total = 0; run_used = set()
     for ep in select(episodes(a.show, a.work), a.only):

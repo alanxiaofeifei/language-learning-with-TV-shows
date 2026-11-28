@@ -3,13 +3,16 @@
 // NOTE: visibleLangs is a DISPLAY preference only, not authorization. Anyone who can sign in can open
 // every language's pages; access control lives in Cloudflare Access + src/worker.js.
 
-export const DEFAULT_ME = Object.freeze({ visibleLangs: null, uiLang: "zh", explainLang: "zh", name: null });
+export const DEFAULT_ME = Object.freeze({ visibleLangs: null, hideLangs: Object.freeze(["vi"]), uiLang: "zh", explainLang: "zh", name: null });
 const UI = ["zh", "vi"];
 const PREFS_KEY = "tv:prefs:v1";
 
 export function normalizeMe(raw) {
   const out = { ...DEFAULT_ME };
   if (!raw || typeof raw !== "object") return out;
+  if (Array.isArray(raw.hideLangs)) {
+    out.hideLangs = raw.hideLangs.filter((x) => typeof x === "string" && /^[a-z]{2,3}$/.test(x));
+  }
   if (Array.isArray(raw.visibleLangs)) {
     const list = raw.visibleLangs.filter((x) => typeof x === "string" && /^[a-z]{2,3}$/.test(x));
     out.visibleLangs = list.length ? list : null;
@@ -27,6 +30,7 @@ export function effectivePrefs(me, local = {}) {
     uiLang: UI.includes(local.uiLang) ? local.uiLang : m.uiLang,
     explainLang: UI.includes(local.explainLang) ? local.explainLang : m.explainLang,
     visibleLangs: m.visibleLangs,
+    hideLangs: m.hideLangs,
     showAllLangs: !!local.showAllLangs,
     name: m.name,
   };
