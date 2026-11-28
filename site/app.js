@@ -3,13 +3,17 @@ import { LESSONS } from "./lib/pron.js";
 import { review, queue, today } from "./lib/srs.js";
 import {
   LANGUAGES, SHOWS, TRACKS, languageById, showsForLanguage,
-  href, matchRoute, isComingLanguage,
+  href, matchRoute, isComingLanguage, isMultiShow,
 } from "./lib/catalog.js";
+import { t, setUiLang, uiLang, UI_LANGS } from "./lib/i18n.js";
+import { DEFAULT_ME, effectivePrefs, homeLanguages, fetchMe, loadLocalPrefs, saveLocalPrefs } from "./lib/prefs.js";
+import { initMulti, renderMulti } from "./multi.js";
 import {
   LONG_STAGES, LONG_TOTAL_WEEKS, WEEK_MODES,
   buildLongWeeks, stageById, nextWeek,
 } from "./lib/long-curriculum.js";
-import { initMotion, motionOn, splitChars, swapMain, paintMain } from "./lib/motion.js";
+import { initMotion, swapMain, paintMain } from "./lib/motion.js";
+import { h, fmt, titleEl, progressBar } from "./lib/dom.js";
 
 const KEY = "vndc:v1";
 const KEY_LONG = "vndc:long:v1";
@@ -36,25 +40,8 @@ function loadLong() {
 function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 function saveLong() { localStorage.setItem(KEY_LONG, JSON.stringify(longState)); }
 
-function h(tag, attrs = {}, ...kids) {
-  const n = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs || {})) {
-    if (v == null || v === false) continue;
-    if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
-    else if (k === "class") n.className = v;
-    else n.setAttribute(k, v === true ? "" : v);
-  }
-  for (const k of kids.flat()) if (k != null && k !== false) n.append(k.nodeType ? k : String(k));
-  return n;
-}
-const fmt = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const yt = (videoId, ms) => `https://www.youtube.com/watch?v=${videoId}&t=${Math.max(0, Math.floor(ms / 1000) - 2)}s`;
 const go = (parts) => href({ lang: ctx.lang, show: ctx.show, track: ctx.track, ...parts });
-function titleEl(text, className = "hero-title") {
-  const el = h("h1", { class: className }, text);
-  if (motionOn()) splitChars(el, text);
-  return el;
-}
 function weekChipLabel(w) {
   const mode = { deep: "", review: " 复习", rewatch: " 回看", cycle: " 循环" }[w.mode] || "";
   const parts = w.parts.length ? " P" + w.parts.join("+P") : "";
@@ -140,78 +127,106 @@ function phraseCard(p, video) {
   return card;
 }
 
-function progressBar(done, total) {
-  const bar = h("div", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(total), "aria-valuenow": String(done) },
-    h("span"));
-  requestAnimationFrame(() => { bar.firstChild.style.width = `${Math.round((done / total) * 100)}%`; });
-  return bar;
-}
-
 function trackSwitch(route) {
   const show = SHOWS[route.show || ctx.show];
-  const current = route.track || state.track || show?.tracks?.[0] || "short";
+  const multi = isMultiShow(show?.id);
+  const current = route.track || (multi ? null : state.track) || show?.tracks?.[0] || "short";
   const base = { lang: route.lang || ctx.lang, show: route.show || ctx.show };
-  return h("span", { class: "tracks", "aria-label": "学习轨道" },
+  return h("span", { class: "tracks", "aria-label": t("track.label") },
     (show?.tracks || ["short", "long"]).map((id) => h("a", {
       href: href({ page: "track", ...base, track: id }),
       "aria-current": current === id ? "true" : null,
-    }, TRACKS[id].nameZh)));
+    }, t("track." + id))));
 }
+
+function userMenu() {
+  const sel = (key, value, label) => h("label", {}, label + " ",
+    h("select", { onchange: (e) => { localPrefs[key] = e.target.value; saveLocalPrefs(localPrefs); applyPrefs(); route({ transition: false, preserveScroll: true }); } },
+      UI_LANGS.map((l) => h("option", { value: l, selected: l === value }, l === "zh" ? "中文" : "Tiếng Việt"))));
+  return h("details", { class: "user-menu" },
+    h("summary", { "aria-label": t("menu.ui") }, prefs.name ? t("menu.hello", { name: prefs.name }) : (prefs.uiLang === "vi" ? "VI" : "中")),
+    h("div", { class: "user-menu-pop" }, sel("uiLang", prefs.uiLang, t("menu.ui")), sel("explainLang", prefs.explainLang, t("menu.explain"))));
+}
+
+function langName(lang) { return uiLang() === "vi" ? (lang.nameVi || lang.nameZh) : lang.nameZh; }
+function langVariant(lang) { return uiLang() === "vi" ? (lang.variantVi || lang.variant) : lang.variant; }
 
 function renderShell(route) {
   const onShow = route.page !== "notfound" && route.show && SHOWS[route.show];
   const lang = languageById(route.lang) || (onShow && languageById(SHOWS[route.show].language));
+  const multi = onShow && isMultiShow(route.show);
   if (onShow) {
-    ctx = { lang: route.lang, show: route.show, track: route.track || state.track || "short" };
-    if (route.track) { state.track = route.track; save(); }
+    ctx = { lang: route.lang, show: route.show, track: route.track || (multi ? "short" : state.track) || "short" };
+    if (route.track && !multi) { state.track = route.track; save(); }
   }
+  document.documentElement.lang = uiLang() === "vi" ? "vi" : "zh-CN";
+  navEl.setAttribute("aria-label", t("nav.label"));
   brandEl.setAttribute("href", onShow ? href({ page: "show", lang: ctx.lang, show: ctx.show }) : "#/");
   brandEl.replaceChildren(
     h("span", { class: "brand-mark", "aria-hidden": "true" }, onShow ? (SHOWS[ctx.show].mark || "剧") : "剧"),
     onShow
-      ? h("span", {}, lang.nameZh, h("small", {}, lang.variant))
-      : h("span", {}, "看剧学语言", h("small", {}, "用原声学口语")),
+      ? h("span", {}, langName(lang), h("small", {}, langVariant(lang)))
+      : h("span", {}, t("brand.title"), h("small", {}, t("brand.sub"))),
   );
 
-  const links = [h("a", { href: "#/", "data-nav": "home" }, "语言")];
+  const links = [h("a", { href: "#/", "data-nav": "home" }, t("nav.languages"))];
   if (onShow) {
     const base = { lang: ctx.lang, show: ctx.show };
     const track = ctx.track;
     links.push(
-      h("a", { href: href({ page: "show", ...base }), "data-nav": "show" }, "这部剧"),
+      h("a", { href: href({ page: "show", ...base }), "data-nav": "show" }, t("nav.show")),
       trackSwitch(route),
-      h("a", { href: href({ page: "track", ...base, track }), "data-nav": "today" }, track === "long" ? "本周" : "今天"),
-      h("a", { href: href({ page: "plan", ...base, track }), "data-nav": "plan" }, "课程"),
-      h("a", { href: href({ page: "parts", ...base }), "data-nav": "parts" }, "剧集"),
-      h("a", { href: href({ page: "review", ...base }), "data-nav": "review" }, "复习"),
-      h("a", { href: href({ page: "scenes", ...base }), "data-nav": "scenes" }, "场景"),
-      h("a", { href: href({ page: "search", ...base }), "data-nav": "search" }, "搜索"),
-      h("a", { href: href({ page: "vlc", ...base }), "data-nav": "vlc" }, "VLC"),
+      h("a", { href: href({ page: "track", ...base, track }), "data-nav": "today" }, track === "long" && !multi ? "本周" : t("nav.today")),
+      h("a", { href: href({ page: "plan", ...base, track }), "data-nav": "plan" }, t("nav.plan")),
+      h("a", { href: href({ page: "parts", ...base }), "data-nav": "parts" }, t("nav.episodes")),
+      h("a", { href: href({ page: "review", ...base }), "data-nav": "review" }, t("nav.review")),
     );
+    if (!multi) {
+      links.push(
+        h("a", { href: href({ page: "scenes", ...base }), "data-nav": "scenes" }, "场景"),
+        h("a", { href: href({ page: "search", ...base }), "data-nav": "search" }, "搜索"),
+        h("a", { href: href({ page: "vlc", ...base }), "data-nav": "vlc" }, "VLC"),
+      );
+    }
   } else if (route.page !== "notfound" && route.lang) {
-    links.push(h("a", { href: href({ page: "lang", lang: route.lang }), "data-nav": "lang" }, languageById(route.lang)?.nameZh || "语种"));
+    links.push(h("a", { href: href({ page: "lang", lang: route.lang }), "data-nav": "lang" }, lang ? langName(lang) : t("nav.languages")));
   }
+  links.push(userMenu());
   navEl.replaceChildren(...links);
-  const navKey = { home: "home", lang: "lang", show: "show", track: "today", day: "today", week: "today", plan: "plan", stage: "plan", part: "parts", parts: "parts", review: "review", scenes: "scenes", search: "search", vlc: "vlc", lesson: "today" }[route.page];
+  const navKey = { home: "home", lang: "lang", show: "show", track: "today", day: "today", week: "today", plan: "plan", stage: "plan", part: "parts", ep: "parts", parts: "parts", review: "review", scenes: "scenes", search: "search", vlc: "vlc", lesson: "today" }[route.page];
   navEl.querySelectorAll(":scope > a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.nav === navKey));
-  if (route.page === "home") document.title = "看剧学语言";
-  else if (route.page === "lang" && lang) document.title = `${lang.nameZh} · 看剧学语言`;
-  else if (onShow) document.title = `${SHOWS[route.show].titleZh} · ${lang.nameZh}`;
+  if (route.page === "home") document.title = t("brand.title");
+  else if (route.page === "lang" && lang) document.title = `${langName(lang)} · ${t("brand.title")}`;
+  else if (onShow) document.title = `${SHOWS[route.show].titleZh} · ${langName(lang)}`;
+}
+
+function plannedList(lang) {
+  if (!lang.planned?.length) return null;
+  return h("ul", { class: "planned" }, lang.planned.map((p) => h("li", {},
+    h("b", {}, uiLang() === "vi" ? (p.titleVi || p.title) : p.title), " · ",
+    h("span", { class: "muted" }, `${t("track." + (p.track === "short" ? "short" : "long"))} · ${uiLang() === "vi" ? p.noteVi : p.noteZh}`))));
 }
 
 function viewHome() {
+  const list = homeLanguages(LANGUAGES, prefs);
+  const filtered = prefs.visibleLangs && list.length < LANGUAGES.length;
+  const canToggle = !!prefs.visibleLangs;
   return [
     h("section", { class: "hero reveal" },
       h("p", { class: "eyebrow" }, "Language school · by TV"),
-      titleEl("看剧学语言"),
-      h("p", { class: "lede" }, "先选一种语言。越南语（北越）已经用《回家吧，孩子》开课：有 12 周短期版，也有按五年在越南生活来排的长期精读。其他语种先占位，等你选好剧再填内容。")),
-    h("div", { class: "lang-grid" }, LANGUAGES.map((lang) =>
+      titleEl(t("brand.title")),
+      h("p", { class: "lede" }, t("home.lede"))),
+    h("div", { class: "lang-grid" }, list.map((lang) =>
       h("a", { class: "lang-card reveal " + lang.status, href: href({ page: "lang", lang: lang.id }), "data-tilt": "1" },
-        h("span", { class: "pill " + (lang.status === "ready" ? "on" : "wait") }, lang.status === "ready" ? "已开放" : "即将推出"),
+        h("span", { class: "pill " + (lang.status === "ready" ? "on" : "wait") }, lang.status === "ready" ? t("lang.ready") : t("lang.coming")),
         h("div", { class: "native" }, lang.nameNative),
-        h("div", { class: "name" }, lang.nameZh),
-        h("div", { class: "variant" }, lang.variant, lang.status === "coming" ? " · 剧集待选" : ""),
+        h("div", { class: "name" }, langName(lang)),
+        h("div", { class: "variant" }, langVariant(lang),
+          lang.status === "coming" && lang.planned?.length ? ` · ${t("lang.planned")}：${lang.planned.map((p) => uiLang() === "vi" ? (p.titleVi || p.title) : p.title).join(" / ")}` : ""),
       ))),
+    canToggle ? h("div", { class: "actions reveal" }, h("button", { class: "btn ghost", type: "button", onclick: () => {
+      localPrefs.showAllLangs = !localPrefs.showAllLangs; saveLocalPrefs(localPrefs); applyPrefs(); route({ transition: false, preserveScroll: true });
+    } }, filtered ? t("home.showAll") : t("home.showMine"))) : null,
   ];
 }
 
@@ -220,23 +235,27 @@ function viewLang(langId) {
   if (!lang) return viewNotFound();
   if (isComingLanguage(langId)) {
     return [h("section", { class: "panel placeholder reveal" },
-      h("p", { class: "eyebrow" }, lang.variant),
-      titleEl(`${lang.nameZh} · ${lang.nameNative}`),
-      h("p", { class: "lede" }, "即将推出 / 剧集待选。内容还没有做，等你选好剧再放进来。结构和路线已经留好，加一部剧就可以开课。"),
-      h("div", { class: "actions" }, h("a", { class: "btn primary", href: "#/" }, "回语言首页")))];
+      h("p", { class: "eyebrow" }, langVariant(lang)),
+      titleEl(`${langName(lang)} · ${lang.nameNative}`),
+      h("p", { class: "lede" }, t("lang.comingLede")),
+      plannedList(lang),
+      h("div", { class: "actions" }, h("a", { class: "btn primary", href: "#/" }, t("lang.back"))))];
   }
   const shows = showsForLanguage(langId);
+  const vn = langId === "vi";
   return [
     h("section", { class: "hero reveal" },
-      h("p", { class: "eyebrow" }, lang.variant),
-      titleEl(lang.nameZh),
-      h("p", { class: "lede" }, "目前开放的教材是《Về nhà đi con》（回家吧，孩子）。同一部剧有两条轨道：12 周短期版，和按五年生活排的长期版。")),
+      h("p", { class: "eyebrow" }, langVariant(lang)),
+      titleEl(langName(lang)),
+      h("p", { class: "lede" }, vn ? "目前开放的教材是《Về nhà đi con》（回家吧，孩子）。同一部剧有两条轨道：12 周短期版，和按五年生活排的长期版。"
+        : t("lang.ledeShow", { title: shows[0]?.titleNative || "" }))),
     h("div", { class: "track-grid" }, shows.map((show) =>
       h("a", { class: "track-card reveal", href: href({ page: "show", lang: langId, show: show.id }), "data-tilt": "1" },
-        h("p", { class: "length" }, `${show.parts} 段 · 两条轨道`),
-        h("h2", {}, show.titleZh),
-        h("p", {}, show.titleNative),
-        h("p", { class: "muted" }, "点进去选择短期或长期。")))),
+        h("p", { class: "length" }, show.kind === "multi" ? t("lang.episodesN", { n: show.episodes }) : `${show.parts} 段 · 两条轨道`),
+        h("h2", {}, show.kind === "multi" ? show.titleNative : show.titleZh),
+        h("p", {}, show.kind === "multi" ? [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · ") : show.titleNative),
+        h("p", { class: "muted" }, vn ? "点进去选择短期或长期。" : t("lang.pickShow"))))),
+    lang.planned?.length ? h("section", { class: "panel reveal" }, h("h2", {}, t("lang.later")), plannedList(lang)) : null,
   ];
 }
 
@@ -554,6 +573,7 @@ function viewNotFound() {
 }
 
 async function render(route) {
+  if (route.show && isMultiShow(route.show) && route.page !== "notfound") return renderMulti(route);
   switch (route.page) {
     case "home": return viewHome();
     case "lang": return viewLang(route.lang);
@@ -586,6 +606,19 @@ async function route({ transition = true, preserveScroll = false } = {}) {
   if (!preserveScroll) window.scrollTo(0, 0);
 }
 
+// Per-user defaults: server suggestion (/private/me.json, Access-protected) + localStorage overrides.
+let me = { ...DEFAULT_ME };
+const localPrefs = loadLocalPrefs();
+let prefs = effectivePrefs(me, localPrefs);
+function applyPrefs() { prefs = effectivePrefs(me, localPrefs); setUiLang(prefs.uiLang); }
+applyPrefs();
+initMulti({ rerender: (opts) => route(opts), prefs: () => prefs });
+
 initMotion();
 window.addEventListener("hashchange", () => route());
 route();
+fetchMe().then((got) => {
+  const before = JSON.stringify(prefs);
+  me = got; applyPrefs();
+  if (JSON.stringify(prefs) !== before) route({ transition: false, preserveScroll: true });
+});
