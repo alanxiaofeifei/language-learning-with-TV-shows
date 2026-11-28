@@ -18,11 +18,11 @@ ES_SPEAKER = re.compile(r"^((?:[-–—]\s*)?)[A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚ�
 def ms(h, m, s, f): return ((int(h) * 60 + int(m)) * 60 + int(s)) * 1000 + int(f.ljust(3, "0")[:3])
 
 def read_srt(path, target="en"):
-    raw = open(path, "rb").read()
+    with open(path, "rb") as f: raw = f.read()
     for enc in ("utf-8-sig", "cp1252", "latin-1"):
         try: text = raw.decode(enc); break
         except UnicodeDecodeError: continue
-    blocks = re.split(r"\r?\n\s*\r?\n", text.replace("\r\n", "\n"))
+    blocks = re.split(r"\n\s*\n", text.replace("\r\n", "\n").replace("\r", "\n"))   # CRLF and CR-only
     out = []
     for b in blocks:
         rows = [r for r in b.strip().split("\n") if r.strip()]

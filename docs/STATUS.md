@@ -3,9 +3,9 @@
 Updated 2026-11-28 19:20 (Asia/Saigon, UTC+7).
 
 ## Spanish shows (feat/es-shows, 2026-11-28) — code ready, data not built
-- Spanish (Mexican / Latin-American baseline) is a ready language in the catalog: 《Club de Cuervos》 乌鸦俱乐部 S04 (12 eps, short-track pick, `2018 · S04`) and 《La casa de las flores》 花之家 S01–S02 (13 + 9 = 22 eps, long-track pick). Text only, es + zh reader, CEFR cards, zh translations and explanations only (no Vietnamese). A Spain-Spanish show stays a planned later stage.
+- Spanish (Mexican / Latin-American baseline) is a ready language in the catalog: 《Club de Cuervos》 乌鸦俱乐部 S04 (12 eps, short-track pick, `2019 · S04`) and 《La casa de las flores》 花之家 S01–S02 (13 + 9 = 22 eps, long-track pick, `2018–2019 · S01–S02`). Text only, es + zh reader, CEFR cards, zh translations and explanations only (no Vietnamese). A Spain-Spanish show stays a planned later stage.
 - Club de Cuervos S01–S03 have no Spanish subtitles on SubDL, so only S04 is included.
-- New `pipeline/multi/fetch_subdl.py` (SubDL API; key from env `SUBDL_API_KEY` only, redacted everywhere). Spanish SRT cleanup, ñ-preserving phrase matching and zh-only prompts in `pipeline/multi/*`.
+- New `pipeline/multi/fetch_subdl.py` (SubDL API; key from env `SUBDL_API_KEY` only, redacted everywhere). After the Codex review it also sanitises upstream names at every output, stores only opaque ids in `subdl-rejected.json`, charges budgets per HTTP attempt, falls through on 404/unreadable candidates, records inspected packs per episode, needs episode metadata for raw bodies, caps sizes, treats `seasonEpisodes` as authoritative, accepts only `--lang ES` and normalises CR-only SRTs. Known gap (out of scope): Spanish lyric cleanup still misses trailing ♪ and wrapped `# … #` lyric lines. Spanish SRT cleanup, ñ-preserving phrase matching and zh-only prompts in `pipeline/multi/*`.
 - Operator still to do: fetch SRTs, run ingest → translate → phrases → build, `episodes_public.py` for both shows (creates `site/shows/<id>/episodes.json`), review, deploy. Linh's `visibleLangs` (zh+en) keeps the Spanish card hidden for her; no `USER_PREFS` change needed.
 - Deploy record: (operator)
 
