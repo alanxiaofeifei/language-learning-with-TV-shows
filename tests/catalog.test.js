@@ -45,7 +45,7 @@ test('new shows have their own private data base and source types', () => {
 for (const [id, count, year] of [
   ['seinfeld', 17, '1990–1993 · S01–S02'],
   ['silicon-valley', 8, '2014 · S01'],
-  ['desperate-housewives', 23, '2004–2005 · S01'],
+  ['desperate-housewives', 22, '2004–2005 · S01'],
 ]) {
   test(`${id} has text-only English routes for both tracks`, () => {
     const show = SHOWS[id];

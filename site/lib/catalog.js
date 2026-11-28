@@ -196,7 +196,7 @@ export const SHOWS = {
     year: "2004–2005 · S01",
     dataBase: showDataBase("desperate-housewives"),
     publicBase: "/shows/desperate-housewives",
-    episodes: 23,
+    episodes: 22,
     langs: ["en", "zh", "vi"],
     levels: "CEFR",
     tracks: ["short", "long"],
