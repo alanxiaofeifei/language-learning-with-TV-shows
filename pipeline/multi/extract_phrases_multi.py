@@ -9,6 +9,7 @@ import argparse, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import cfg, episodes, select, gen_dir, save, load
 from llm import chat_json, USED
+from textmatch import norm, matches
 
 LEVELS = {"HSK": ["HSK1", "HSK2", "HSK3", "HSK4", "HSK5", "HSK6", "HSK7-9"], "CEFR": ["A1", "A2", "B1", "B2", "C1", "C2"]}
 
@@ -27,14 +28,10 @@ def system(c, n):
             '"usage_vi":"越南语：什么场合用 + 一个自编新例句（附中文或英文原文）","usage_zh":"中文：什么场合用 + 一个自编新例句"}。'
             '例句必须自编，不能抄剧中台词。只输出 JSON {"phrases":[...]}。')
 
-def norm(s, zh):
-    s = s or ""
-    return re.sub(r"[\s，。！？、,.!?…\"'“”‘’]", "", s) if zh else re.sub(r"[^a-z0-9' ]", "", s.lower()).strip()
-
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("show"); ap.add_argument("work")
     ap.add_argument("--only"); ap.add_argument("--n", type=int, default=15); ap.add_argument("--force", action="store_true"); a = ap.parse_args()
-    c = cfg(a.show); src = c["target"]; zh = src == "zh"; gen = gen_dir(a.work); total = 0
+    c = cfg(a.show); src = c["target"]; zh = src == "zh"; gen = gen_dir(a.work); total = 0; run_used = set()
     if zh:
         from ingest_youtube_json3 import pinyin
     for ep in select(episodes(a.show, a.work), a.only):
@@ -44,7 +41,9 @@ def main():
         if not lines: continue
         usable = [L for L in lines if L.get(src) and not re.fullmatch(r"\[.*\]", L[src])]
         user = f"《{c['title']['zh']}》{ep['code']} 字幕：\n" + "\n".join(f"{L['i']}: {L[src]}" for L in usable)
+        USED.clear()                      # meta records only this episode's providers
         got = chat_json(system(c, a.n), user, temperature=0.3).get("phrases", [])
+        run_used |= USED
         by_i = {L["i"]: L for L in lines}; res, seen = [], set()
         for p in got:
             phrase = (p.get("phrase") or "").strip().strip("，。,.!?！？")
@@ -54,9 +53,9 @@ def main():
             key = norm(phrase, zh)
             if not key or key in seen: continue
             cand = [i] + [j for d in range(1, 4) for j in (i - d, i + d)]
-            hit = next((j for j in cand if j in by_i and key in norm(by_i[j].get(src), zh)), None)
+            hit = next((j for j in cand if j in by_i and matches(key, norm(by_i[j].get(src), zh), zh)), None)
             if hit is None:
-                hit = next((L["i"] for L in usable if key in norm(L[src], zh)), None)
+                hit = next((L["i"] for L in usable if matches(key, norm(L[src], zh), zh)), None)
             if hit is None: print("drop (not in source)", ep["code"], phrase, file=sys.stderr); continue
             seen.add(key); L = by_i[hit]
             lv = str(p.get("level", "")).upper().replace(" ", "")
@@ -73,6 +72,6 @@ def main():
         meta_p = os.path.join(gen, ep["code"] + ".meta.json"); meta = load(meta_p, {}) or {}
         meta["phrases"] = sorted(USED); save(meta_p, meta)
         print(f"{ep['code']}: {len(res)} phrases", file=sys.stderr)
-    print(json.dumps({"phrases": total, "providers": sorted(USED)}))
+    print(json.dumps({"phrases": total, "providers": sorted(run_used)}))
 
 if __name__ == "__main__": main()

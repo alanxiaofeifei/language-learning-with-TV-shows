@@ -10,13 +10,23 @@ from common import cfg, episodes, select, gen_dir, save, load
 
 PRE, POST, CAP = 0.25, 0.4, 7.0
 
-def cut(audio, start_ms, end_ms, out):
+MIN_DUR = 0.5
+
+def span(start_ms, end_ms):
+    """(start s, duration s). A malformed cue (end before start, or missing) still gives >= MIN_DUR."""
+    start_ms = max(0, int(start_ms or 0)); end_ms = max(start_ms, int(end_ms or 0))
     s = max(0.0, start_ms / 1000 - PRE)
-    dur = min(CAP, end_ms / 1000 + POST - s)
+    return s, max(MIN_DUR, min(CAP, end_ms / 1000 + POST - s))
+
+def cut(audio, start_ms, end_ms, out):
+    s, dur = span(start_ms, end_ms)
     tmp = out + ".part.mp3"
-    subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", f"{s:.3f}", "-i", audio, "-t", f"{dur:.3f}",
-                    "-vn", "-ac", "1", "-ar", "44100", "-b:a", "64k", tmp], check=True)
-    os.replace(tmp, out)
+    try:
+        subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", f"{s:.3f}", "-i", audio, "-t", f"{dur:.3f}",
+                        "-vn", "-ac", "1", "-ar", "44100", "-b:a", "64k", tmp], check=True)
+        os.replace(tmp, out)
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("show"); ap.add_argument("work")
@@ -33,7 +43,8 @@ def main():
         for p in phrases:
             name = p["id"] + ".mp3"; out = os.path.join(d, name)
             if os.path.exists(out) and not a.force: p["clip"] = name; kept += 1; continue
-            try: cut(audio, p["start"], p["end"], out); p["clip"] = name; made += 1
+            p.pop("clip", None)               # never keep a stale clip name if this cut fails
+            try: cut(audio, p.get("start"), p.get("end"), out); p["clip"] = name; made += 1
             except subprocess.CalledProcessError as e: print("ffmpeg failed", ep["code"], p["id"], e.returncode, file=sys.stderr)
         save(ph_p, phrases)
     print(json.dumps({"made": made, "kept": kept, "episodesWithoutAudio": no_audio}))

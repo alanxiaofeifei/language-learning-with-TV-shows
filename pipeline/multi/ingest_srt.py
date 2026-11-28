@@ -1,7 +1,7 @@
 """Text-only show: English SRT -> lines per episode.
 
 Usage: python pipeline/multi/ingest_srt.py SHOW_ID WORKDIR [--only S01E01,S01E02] [--force]
-Strips HTML/ASS tags and music notes, keeps speaker dashes and [SOUND] cues as-is.
+Strips HTML/ASS tags and music notes (♪ ♫, and # only as a lyric marker), keeps speaker dashes and [SOUND] cues as-is.
 Writes WORKDIR/gen/SxxEyy.lines.json = [{i,start,end,en}] (ms). If the file exists, keeps existing
 translations (zh/vi) for lines whose English text is unchanged; skips entirely unless --force.
 """
@@ -34,7 +34,12 @@ def read_srt(path):
 def clean_text(r):
     r = re.sub(r"<[^>]+>", "", r)           # <i>, <font ...>
     r = re.sub(r"\{\\[^}]*\}", "", r)       # {\an8}
-    r = r.replace("♪", "").replace("♫", "").replace("#", "")
+    r = r.replace("♪", "").replace("♫", "")
+    # "#" marks sung lyrics ("# Smelly cat #"), but also appears in dialogue ("We're #1!", "Apt. #20"):
+    # drop it only when it wraps the whole line or stands alone between spaces.
+    s = r.strip()
+    if len(s) > 1 and s.startswith("#") and s.endswith("#"): r = s.strip("#")
+    r = re.sub(r"(?:^|(?<=\s))#+(?=\s|$)", "", r)
     return re.sub(r"\s+", " ", r).strip()
 
 def main():

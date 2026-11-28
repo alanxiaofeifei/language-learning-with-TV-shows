@@ -1,8 +1,9 @@
 """Official YouTube subtitle tracks (json3) -> aligned lines per episode.
 
 Usage: python pipeline/multi/ingest_youtube_json3.py SHOW_ID WORKDIR [--only EP01,EP02] [--force]
-zh-Hans and vi share cue timing (joined by cue start); en has its own timing and is attached to the
-zh cue it overlaps most (en cues with no overlap, e.g. title cards, become their own lines).
+zh-Hans and vi share cue timing (joined by exact cue start; a vi cue with no exact match is attached
+to the line it overlaps most); en has its own timing and is attached the same way. Cues with no
+overlap (e.g. title cards) become their own lines. Cues whose text is empty after cleaning are dropped.
 Writes WORKDIR/gen/EPxx.lines.json = [{i,start,end,zh,py,vi,en}] (ms). Skips existing unless --force.
 """
 import argparse, json, os, sys
@@ -21,9 +22,10 @@ def cues(path):
     for ev in d.get("events", []):
         if "segs" not in ev: continue
         text = clean("".join(s.get("utf8", "") for s in ev["segs"]))
-        start = int(ev.get("tStartMs", 0)); end = start + int(ev.get("dDurationMs", 0))
+        if not text: continue
+        start = int(ev.get("tStartMs", 0)); end = start + max(0, int(ev.get("dDurationMs", 0)))
         out.append({"start": start, "end": end, "text": text})
-    return out
+    return sorted(out, key=lambda c: (c["start"], c["end"]))
 
 def pinyin(text):
     if not text: return ""
@@ -38,18 +40,12 @@ def pinyin(text):
 def overlap(a, b):
     return max(0, min(a["end"], b["end"]) - max(a["start"], b["start"]))
 
-def align(zh, vi, en):
-    vi_by_start = {}
-    for c in vi: vi_by_start.setdefault(c["start"], []).append(c["text"])
-    lines = []
-    for c in zh:
-        v = vi_by_start.get(c["start"], [])
-        lines.append({"start": c["start"], "end": c["end"], "zh": c["text"], "vi": v.pop(0) if v else "", "en": []})
-    if not zh:                                   # no zh track: fall back to vi timing
-        lines = [{"start": c["start"], "end": c["end"], "zh": "", "vi": c["text"], "en": []} for c in vi]
+def attach(lines, items, key):
+    """Append each item's text to lines[*][key] (a list) of the line it overlaps most.
+    lines and items sorted by start. Returns the lines plus new single-item lines for non-overlapping items."""
     orphans = []
     j0 = 0
-    for e in en:
+    for e in items:
         if not e["text"]: continue
         best, bo = None, 0
         while j0 < len(lines) and lines[j0]["end"] < e["start"] - 10000: j0 += 1
@@ -58,14 +54,31 @@ def align(zh, vi, en):
             if L["start"] > e["end"]: break
             o = overlap(L, e)
             if o > bo: best, bo = j, o
-        if best is None: orphans.append({"start": e["start"], "end": e["end"], "zh": "", "vi": "", "en": [e["text"]]})
-        else: lines[best]["en"].append(e["text"])
-    lines = sorted(lines + orphans, key=lambda L: (L["start"], L["end"]))
+        if best is None:
+            o = {"start": e["start"], "end": e["end"], "zh": "", "vi": [], "en": []}; o[key] = [e["text"]]; orphans.append(o)
+        else: lines[best][key].append(e["text"])
+    return sorted(lines + orphans, key=lambda L: (L["start"], L["end"]))
+
+def align(zh, vi, en):
+    zh = [c for c in zh if c["text"]]; vi = [c for c in vi if c["text"]]; en = [c for c in en if c["text"]]
+    if zh:
+        vi_by_start = {}
+        for k, c in enumerate(vi): vi_by_start.setdefault(c["start"], []).append(k)
+        used = set(); lines = []
+        for c in zh:
+            ks = vi_by_start.get(c["start"], [])
+            v = []
+            if ks: k = ks.pop(0); used.add(k); v = [vi[k]["text"]]
+            lines.append({"start": c["start"], "end": c["end"], "zh": c["text"], "vi": v, "en": []})
+        lines = attach(lines, [c for k, c in enumerate(vi) if k not in used], "vi")
+    else:                                        # no zh track: fall back to vi timing
+        lines = [{"start": c["start"], "end": c["end"], "zh": "", "vi": [c["text"]], "en": []} for c in vi]
+    lines = attach(lines, en, "en")
     out = []
     for L in lines:
         if not (L["zh"] or L["vi"] or L["en"]): continue
         out.append({"i": len(out), "start": L["start"], "end": L["end"], "zh": L["zh"], "py": pinyin(L["zh"]),
-                    "vi": L["vi"], "en": " ".join(L["en"])})
+                    "vi": " ".join(L["vi"]), "en": " ".join(L["en"])})
     return out
 
 def main():

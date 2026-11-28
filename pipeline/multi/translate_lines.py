@@ -24,7 +24,7 @@ def main():
     c = cfg(a.show)
     langs = [x for x in (a.langs.split(",") if a.langs else c["translate"]) if x]
     if not langs: print(json.dumps({"note": "nothing to translate for " + a.show})); return
-    src = c["target"]; gen = gen_dir(a.work); total = 0
+    src = c["target"]; gen = gen_dir(a.work); total = 0; run_used = set()
     for ep in select(episodes(a.show, a.work), a.only):
         path = os.path.join(gen, ep["code"] + ".lines.json")
         lines = load(path)
@@ -32,13 +32,14 @@ def main():
         todo = [L for L in lines if L.get(src) and any(not L.get(k) for k in langs)]
         if not todo: continue
         by_i = {L["i"]: L for L in lines}
+        USED.clear()                      # meta records only this episode's providers
         for b in range(0, len(todo), a.batch):
             chunk = todo[b:b + a.batch]
             first = chunk[0]["i"]
             ctx = [by_i[j][src] for j in range(max(0, first - 4), first) if j in by_i]
             user = (("上文（仅供理解，不要输出）：\n" + "\n".join(ctx) + "\n\n") if ctx else "") + \
                    "字幕：\n" + "\n".join(f"{L['i']}: {L[src]}" for L in chunk)
-            got = chat_json(system(c, langs), user, temperature=0.3).get("t", [])
+            got = chat_json(system(c, langs), user, temperature=0.3).get("t", []); run_used |= USED
             n = 0
             for row in got:
                 if not isinstance(row, list) or len(row) < 1 + len(langs): continue
@@ -51,6 +52,6 @@ def main():
             print(f"{ep['code']} batch {b // a.batch + 1}/{(len(todo) + a.batch - 1) // a.batch}: {n} fields", file=sys.stderr)
         meta_p = os.path.join(gen, ep["code"] + ".meta.json"); meta = load(meta_p, {}) or {}
         meta["translate"] = sorted(set(meta.get("translate", [])) | USED); save(meta_p, meta)
-    print(json.dumps({"filled": total, "providers": sorted(USED)}))
+    print(json.dumps({"filled": total, "providers": sorted(run_used)}))
 
 if __name__ == "__main__": main()
