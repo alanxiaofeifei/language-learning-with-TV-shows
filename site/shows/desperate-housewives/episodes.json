@@ -1,0 +1,116 @@
+{
+ "show": "desperate-housewives",
+ "source": "text-only",
+ "episodes": [
+  {
+   "n": 1,
+   "code": "S01E01",
+   "title": "Pilot"
+  },
+  {
+   "n": 2,
+   "code": "S01E02",
+   "title": "Ah, But Underneath"
+  },
+  {
+   "n": 3,
+   "code": "S01E03",
+   "title": "Pretty Little Picture"
+  },
+  {
+   "n": 4,
+   "code": "S01E04",
+   "title": "Who's that Woman?"
+  },
+  {
+   "n": 5,
+   "code": "S01E05",
+   "title": "Come in, Stranger"
+  },
+  {
+   "n": 6,
+   "code": "S01E06",
+   "title": "Running to Stand Still"
+  },
+  {
+   "n": 7,
+   "code": "S01E07",
+   "title": "Anything You Can Do"
+  },
+  {
+   "n": 8,
+   "code": "S01E08",
+   "title": "Guilty"
+  },
+  {
+   "n": 9,
+   "code": "S01E09",
+   "title": "Suspicious Minds"
+  },
+  {
+   "n": 10,
+   "code": "S01E10",
+   "title": "Come Back to Me"
+  },
+  {
+   "n": 11,
+   "code": "S01E11",
+   "title": "Move On"
+  },
+  {
+   "n": 12,
+   "code": "S01E12",
+   "title": "Every Day a Little Death"
+  },
+  {
+   "n": 13,
+   "code": "S01E13",
+   "title": "Your Fault"
+  },
+  {
+   "n": 14,
+   "code": "S01E14",
+   "title": "Love Is in the Air"
+  },
+  {
+   "n": 15,
+   "code": "S01E15",
+   "title": "Impossible"
+  },
+  {
+   "n": 16,
+   "code": "S01E17",
+   "title": "There Won't Be Trumpets"
+  },
+  {
+   "n": 17,
+   "code": "S01E18",
+   "title": "Children Will Listen"
+  },
+  {
+   "n": 18,
+   "code": "S01E19",
+   "title": "Live Alone and Like It"
+  },
+  {
+   "n": 19,
+   "code": "S01E20",
+   "title": "Fear No More"
+  },
+  {
+   "n": 20,
+   "code": "S01E21",
+   "title": "Sunday in the Park with George"
+  },
+  {
+   "n": 21,
+   "code": "S01E22",
+   "title": "Goodbye For Now"
+  },
+  {
+   "n": 22,
+   "code": "S01E23",
+   "title": "One Wonderful Day"
+  }
+ ]
+}

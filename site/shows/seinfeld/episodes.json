@@ -1,0 +1,91 @@
+{
+ "show": "seinfeld",
+ "source": "text-only",
+ "episodes": [
+  {
+   "n": 1,
+   "code": "S01E01",
+   "title": "The Seinfeld Chronicles"
+  },
+  {
+   "n": 2,
+   "code": "S01E02",
+   "title": "The Stakeout"
+  },
+  {
+   "n": 3,
+   "code": "S01E03",
+   "title": "The Robbery"
+  },
+  {
+   "n": 4,
+   "code": "S01E04",
+   "title": "Male Unbonding"
+  },
+  {
+   "n": 5,
+   "code": "S01E05",
+   "title": "The Stock Tip"
+  },
+  {
+   "n": 6,
+   "code": "S02E01",
+   "title": "The Ex-Girlfriend"
+  },
+  {
+   "n": 7,
+   "code": "S02E02",
+   "title": "The Pony Remark"
+  },
+  {
+   "n": 8,
+   "code": "S02E03",
+   "title": "The Jacket"
+  },
+  {
+   "n": 9,
+   "code": "S02E04",
+   "title": "The Phone Message"
+  },
+  {
+   "n": 10,
+   "code": "S02E05",
+   "title": "The Apartment"
+  },
+  {
+   "n": 11,
+   "code": "S02E06",
+   "title": "The Statue"
+  },
+  {
+   "n": 12,
+   "code": "S02E07",
+   "title": "The Revenge"
+  },
+  {
+   "n": 13,
+   "code": "S02E08",
+   "title": "The Heart Attack"
+  },
+  {
+   "n": 14,
+   "code": "S02E09",
+   "title": "The Deal"
+  },
+  {
+   "n": 15,
+   "code": "S02E10",
+   "title": "The Baby Shower"
+  },
+  {
+   "n": 16,
+   "code": "S02E11",
+   "title": "The Chinese Restaurant"
+  },
+  {
+   "n": 17,
+   "code": "S02E12",
+   "title": "The Busboy"
+  }
+ ]
+}
