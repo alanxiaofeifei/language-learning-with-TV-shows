@@ -201,6 +201,7 @@ function renderShell(route) {
         h("a", { href: href({ page: "scenes", ...base }), "data-nav": "scenes" }, "场景"),
         h("a", { href: href({ page: "search", ...base }), "data-nav": "search" }, "搜索"),
         h("a", { href: href({ page: "vlc", ...base }), "data-nav": "vlc" }, "VLC"),
+        h("a", { href: href({ page: "download", ...base }), "data-nav": "download" }, "下载视频"),
       );
     }
   } else if (route.page !== "notfound" && route.lang) {
@@ -208,7 +209,7 @@ function renderShell(route) {
   }
   links.push(userMenu());
   navEl.replaceChildren(...links.filter(Boolean));
-  const navKey = { home: "home", lang: "lang", show: "show", track: "today", day: "today", week: "today", plan: "plan", stage: "plan", part: "parts", ep: "parts", parts: "parts", review: "review", scenes: "scenes", search: "search", vlc: "vlc", lesson: "today" }[route.page];
+  const navKey = { home: "home", lang: "lang", show: "show", track: "today", day: "today", week: "today", plan: "plan", stage: "plan", part: "parts", ep: "parts", parts: "parts", review: "review", scenes: "scenes", search: "search", vlc: "vlc", download: "download", lesson: "today" }[route.page];
   navEl.querySelectorAll(":scope > a").forEach((a) => a.toggleAttribute("aria-current", a.dataset.nav === navKey));
   if (route.page === "home") document.title = t("brand.title");
   else if (route.page === "lang" && lang) document.title = `${langName(lang)} · ${t("brand.title")}`;
@@ -374,6 +375,7 @@ async function partBlock(n, compact = false) {
       h("a", { class: "btn primary", href: `https://www.youtube.com/watch?v=${meta.videoId}`, target: "_blank", rel: "noopener" }, "在 YouTube 看"),
       h("a", { class: "btn", href: meta.srt, download: meta.srt.split("/").pop() }, "下载双语字幕 .srt"),
       h("a", { class: "btn ghost", href: go({ page: "vlc" }) }, "VLC 怎么用"),
+      h("a", { class: "btn ghost", href: go({ page: "download" }) }, "怎么下载视频"),
       compact ? h("a", { class: "btn ghost", href: go({ page: "part", part: n }) }, "全文台词") : null,
       h("button", { class: "btn ghost", type: "button", onclick: () => { state.watched[n] = !watched; save(); route({ transition: false, preserveScroll: true }); } }, watched ? "✓ 已看" : "标记已看")),
     h("h3", { class: "section-title" }, `今日用语 ${phrases.length} 条`),
@@ -582,10 +584,13 @@ async function viewSearch(qs) {
   return [h("h1", { class: "reveal" }, "全剧搜索"), h("p", { class: "muted reveal" }, "在 82 段台词里找一个词出现在哪些场景，点时间去 YouTube 听原声。"), input, results];
 }
 
-async function viewVlc() {
-  const md = await fetch("./vlc.html").then((r) => r.text());
+// Static tutorial pages (our own content, public). In-page links use the short aliases (#/vlc, #/download).
+async function viewTutorial(file) {
+  const md = await fetch(file).then((r) => r.text());
   const box = h("section", { class: "panel prose reveal" }); box.innerHTML = md; return [box];
 }
+const viewVlc = () => viewTutorial("./vlc.html");
+const viewDownload = () => viewTutorial("./download.html");
 
 function viewNotFound() {
   return [h("p", { class: "reveal" }, "页面不存在。"), h("a", { class: "btn", href: "#/" }, "回语言首页")];
@@ -609,6 +614,7 @@ async function render(route) {
     case "scenes": return viewScenes(route.cat);
     case "search": return viewSearch(route.q);
     case "vlc": return viewVlc();
+    case "download": return viewDownload();
     case "lesson": return lessonView(route.lesson);
     default: return viewNotFound();
   }

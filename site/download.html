@@ -1,0 +1,46 @@
+<h1>怎么把视频下载到电脑（配合 VLC 看字幕）</h1>
+<p>这一页教你把<b>官方 YouTube</b> 上的视频存到本地，再和网站下载的 <code>.srt</code> 字幕放一起，用 VLC 看（VLC 的用法见 <a href="#/vlc">VLC 教程</a>）。下面两个工具任选一个：<b>Ghost Downloader 3</b>（桌面客户端 + 浏览器扩展，开源免费）或 <b>SnapAny</b>（网页解析，不用装东西）。</p>
+<p><b>请注意：</b>只下载你有权观看的内容，只用于个人学习，不要转发或上传。需要付费、会员或 DRM 保护的平台视频（例如 Netflix）不能用这种方法，也请不要尝试绕过保护。</p>
+<h2>方法一：Ghost Downloader 3（桌面客户端 + 浏览器扩展）</h2>
+<p>项目主页：<a href="https://github.com/XiaoYouChR/Ghost-Downloader-3" target="_blank" rel="noopener">github.com/XiaoYouChR/Ghost-Downloader-3</a>；官方文档：<a href="https://gd.xychr.com/docs/" target="_blank" rel="noopener">gd.xychr.com/docs</a>。以下步骤来自这份文档。</p>
+<h3>1. 安装</h3>
+<ol>
+<li>打开项目的 <a href="https://github.com/XiaoYouChR/Ghost-Downloader-3/releases" target="_blank" rel="noopener">GitHub Releases</a> 页面，按系统选安装包：Windows 10 及以上选 <code>*-Setup.exe</code>（安装版）或 <code>*.zip</code>（免安装，解压即用）；macOS 13 及以上选 <code>.dmg</code>；Linux 选 <code>.AppImage</code>。</li>
+<li>注意选对架构（<code>x86_64</code> 或 <code>arm64</code>）。不支持 Windows 7，也不支持没有 AVX 指令集的老 CPU（约 2011 年以前）。</li>
+</ol>
+<h3>2. 装浏览器扩展并配对</h3>
+<ol>
+<li>打开 Ghost Downloader，进入 <b>设置 → 浏览器扩展</b>：Chrome、Brave 等 Chromium 内核浏览器可以一键安装；Chrome、Edge、Firefox 也可以从应用商店安装。</li>
+<li>扩展装好后要配对：打开扩展面板 → 设置 → 点<b>自动配对</b>，桌面程序弹出配对请求时点<b>允许</b>。</li>
+<li>如果没有弹出请求：在桌面程序 设置 → 浏览器扩展 里复制<b>配对令牌</b>，粘贴到扩展设置里的令牌输入框。</li>
+<li>配对成功后，扩展面板顶部显示<b>已连接</b>。</li>
+</ol>
+<h3>3. 下载一个 YouTube 视频</h3>
+<ol>
+<li>在浏览器里打开视频页，鼠标移到视频上，点出现的<b>下载按钮</b>；或者直接把视频链接粘贴到 Ghost Downloader 主窗口。</li>
+<li>弹出确认窗口（草稿模式）：在<b>清晰度</b>下拉里选分辨率，学习用 720p 或 1080p 就够了。没弹窗的话，先到 设置 → 浏览器扩展 打开「接管下载时进入草稿模式」。</li>
+<li>设置 → YouTube 下载 里的「优先 MP4 格式」默认开启，会输出 H.264/MP4，VLC 和大多数播放器都能直接放，建议保持开启。</li>
+<li>点<b>下载</b>。主窗口的任务卡片会显示速度和进度；完成后右键任务 → <b>打开文件夹</b>。</li>
+</ol>
+<p>提示：确认窗口里也有字幕按钮，可以顺便下载平台自带字幕（保存为 <code>.vtt</code>，和视频同一个文件夹）。我们的学习字幕是网站上的 <code>.srt</code>，两者不要混用。</p>
+<h2>方法二：SnapAny（网页解析，不用安装）</h2>
+<p>打开 <a href="https://snapany.com/zh/youtube-video-saver" target="_blank" rel="noopener">snapany.com/zh/youtube-video-saver</a>（YouTube 视频下载页）。按页面上的三步操作：</p>
+<ol>
+<li><b>复制视频链接</b>：在 YouTube App 里点视频下方的「分享 → 复制链接」；网页版直接复制浏览器地址栏。</li>
+<li><b>粘贴解析</b>：回到 SnapAny，把链接粘贴到输入框，点解析按钮，等几秒。</li>
+<li><b>下载保存</b>：解析成功后会列出这个视频提供的各档清晰度，选一档点<b>下载</b>。能选到哪些档位取决于视频本身。</li>
+</ol>
+<p>SnapAny 也有 Windows / Mac 桌面客户端和浏览器插件（插件能自动识别网页里的视频，一键保存），页面上有下载入口。</p>
+<p><b>小心广告：</b>SnapAny 页面上有一条推广其他 App 的广告，我们没有评估过它。不需要为了下载视频去装任何 App；只用网页解析，或者用上面的 Ghost Downloader 即可。</p>
+<h2>下载好以后：和我们的字幕配对（VLC）</h2>
+<ol>
+<li>在学习网站对应那一集点「下载双语字幕 .srt」。</li>
+<li>把视频和 <code>.srt</code> 放进同一个文件夹，<b>文件名只差扩展名</b>。下载工具给的文件名一般是视频标题，需要手动改，例如：
+<pre>
+VeNhaDiCon_P01_08B-aPzkLAg.mp4
+VeNhaDiCon_P01_08B-aPzkLAg.srt
+</pre></li>
+<li>用 VLC 打开视频，字幕会自动出现；没出现就把 <code>.srt</code> 拖进播放窗口，或用 字幕 → 添加字幕文件。详细操作、字体设置和常用快捷键见 <a href="#/vlc">VLC 教程</a>。</li>
+<li><b>时间对不上怎么办：</b>《Về nhà đi con》的字幕时间轴对应 VFC Official 频道的上传版本（文件名最后那串字母是 YouTube 视频 ID），请下载这个频道的视频。其他剧是文字字幕，时间是近似的，对不上时在 VLC 里按 G / H 微调 50 ms。</li>
+</ol>
+<p class="muted">再提醒一次：只下载你有权观看的内容，仅供个人学习使用。</p>
