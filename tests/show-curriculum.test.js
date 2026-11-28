@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SHOWS } from '../site/lib/catalog.js';
 import { buildShowDays, watchDays, nextShowDay, SHORT_WEEKS, LONG_OUTLINES, SHORT_DAYS } from '../site/lib/show-curriculum.js';
 
-for (const n of [46, 48, 82, 100, 1]) {
-  test(`short track for a ${n}-episode show: 84 days, each episode watched exactly once, in order`, () => {
+for (const n of [46, 48, 82, 100, 1, 8, 17, 23]) {
+  test(`short track for ${n} episodes: 84 days, each episode watched exactly once, in order`, () => {
     const days = buildShowDays(n);
     assert.equal(days.length, SHORT_DAYS);
     assert.deepEqual(days.map((d) => d.day), Array.from({ length: 84 }, (_, i) => i + 1));
@@ -34,5 +35,9 @@ test('weekly themes and long outlines exist in zh and vi for both new languages'
     for (const s of LONG_OUTLINES[lang]) assert.ok(s.goal.zh && s.goal.vi && s.span.zh && s.span.vi);
   }
   assert.deepEqual(LONG_OUTLINES.zh.map((s) => s.show), ['都挺好', '欢乐颂 1', '我们与恶的距离']);
-  assert.deepEqual(LONG_OUTLINES.en.map((s) => s.show), ['Friends', 'Seinfeld', 'Desperate Housewives + Silicon Valley']);
+  for (const { show, showId, status } of LONG_OUTLINES.en) {
+    assert.equal(SHOWS[showId].titleNative, show);
+    assert.equal(status, 'now');
+  }
+  assert.deepEqual(LONG_OUTLINES.en.map((s) => s.show), ['Friends', 'Seinfeld', 'Desperate Housewives', 'Silicon Valley']);
 });

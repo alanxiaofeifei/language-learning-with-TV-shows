@@ -84,8 +84,27 @@ class FetchTests(unittest.TestCase):
             client.get.assert_called_with("files/example_en.zip", referer="subtitle-15.html")
             self.assertEqual((workdir / "srt/S01E02.en.srt").read_bytes(), b"fixture")
             rows = episodes("seinfeld", workdir)
-            self.assertEqual([row["code"] for row in rows], ["S01E01", "S01E02", "S01E03", "S02E01"])
-            self.assertIsNone(rows[2]["srt"])
+            self.assertEqual([row["code"] for row in rows], ["S01E01", "S01E02"])
+
+    def test_text_only_episodes_skip_missing_srts_before_numbering(self):
+        with TemporaryDirectory() as folder:
+            workdir = Path(folder)
+            fetcher.save(str(workdir / "episodes.json"), [
+                {"code": "S01E00", "title": "Missing Pilot"},
+                {"code": "S01E01", "title": "First Episode"},
+                {"code": "S01E02", "title": "Missing Episode"},
+                {"code": "S02E01", "title": "Second Season"},
+            ])
+            srt_dir = workdir / "srt"
+            srt_dir.mkdir()
+            (srt_dir / "S01E02.en.srt").mkdir()
+            for code in ("S01E01", "S01E03", "S02E01"):
+                (srt_dir / f"{code}.en.srt").touch()
+            self.assertEqual(episodes("seinfeld", workdir), [
+                {"n": 1, "code": "S01E01", "title": "First Episode", "srt": str(srt_dir / "S01E01.en.srt")},
+                {"n": 2, "code": "S01E03", "title": "", "srt": str(srt_dir / "S01E03.en.srt")},
+                {"n": 3, "code": "S02E01", "title": "Second Season", "srt": str(srt_dir / "S02E01.en.srt")},
+            ])
 
     def test_retry_uses_backoff_and_user_agent(self):
         error = HTTPError(fetcher.BASE, 503, "Unavailable", None, None)

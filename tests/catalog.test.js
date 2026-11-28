@@ -11,7 +11,7 @@ test('catalog: vi, zh, en ready; fr/ja/es/yue placeholders with planned picks', 
   assert.deepEqual(ready, ['vi', 'zh', 'en']);
   assert.deepEqual(languageById('vi').shows, ['ve-nha-di-con']);
   assert.deepEqual(languageById('zh').shows, ['dou-ting-hao']);
-  assert.deepEqual(languageById('en').shows, ['friends']);
+  assert.deepEqual(languageById('en').shows, ['friends', 'seinfeld', 'silicon-valley', 'desperate-housewives']);
   for (const lang of LANGUAGES.filter((l) => l.status === 'coming')) {
     assert.equal(lang.shows.length, 0);
     assert.equal(isComingLanguage(lang.id), true);
@@ -23,7 +23,7 @@ test('catalog: vi, zh, en ready; fr/ja/es/yue placeholders with planned picks', 
   assert.match(titles('ja'), /逃げるは恥だが役に立つ/);
   assert.match(titles('es'), /Club de Cuervos/); assert.match(titles('es'), /La casa de las flores/);
   assert.match(titles('yue'), /愛·回家之開心速遞/);
-  assert.match(titles('en'), /Seinfeld/); assert.match(titles('en'), /Desperate Housewives/); assert.match(titles('en'), /Silicon Valley/);
+  assert.deepEqual(languageById('en').planned, []);
   assert.match(titles('zh'), /欢乐颂/); assert.match(titles('zh'), /我们与恶的距离/);
   assert.match(titles('vi'), /Gạo nếp gạo tẻ/);
   assert.equal(SHOWS[DEFAULT_SHOW].language, 'vi');
@@ -41,6 +41,34 @@ test('new shows have their own private data base and source types', () => {
   assert.equal(fr.dataBase, '/private/shows/friends'); assert.equal(fr.watch.url, 'https://www.hbomax.com/');
   assert.ok(isMultiShow('friends') && isMultiShow('dou-ting-hao') && !isMultiShow('ve-nha-di-con'));
 });
+
+for (const [id, count, year] of [
+  ['seinfeld', 17, '1990–1993 · S01–S02'],
+  ['silicon-valley', 8, '2014 · S01'],
+  ['desperate-housewives', 23, '2004–2005 · S01'],
+]) {
+  test(`${id} has text-only English routes for both tracks`, () => {
+    const show = SHOWS[id];
+    assert.ok(isMultiShow(id));
+    assert.equal(show.language, 'en');
+    assert.equal(show.source, 'text-only');
+    assert.equal(show.watch, null);
+    assert.equal(show.year, year);
+    assert.equal(show.episodes, count);
+    assert.equal(show.dataBase, `/private/shows/${id}`);
+    assert.equal(show.publicBase, `/shows/${id}`);
+    assert.deepEqual(show.tracks, ['short', 'long']);
+    for (const track of show.tracks) {
+      const route = matchRoute(href({ page: 'track', lang: 'en', show: id, track }));
+      assert.equal(route.page, 'track');
+      assert.equal(route.show, id);
+      assert.equal(route.track, track);
+    }
+    const route = matchRoute(href({ page: 'ep', lang: 'en', show: id, ep: count }));
+    assert.equal(route.page, 'ep');
+    assert.equal(route.ep, count);
+  });
+}
 
 test('new show routes round-trip and cross-language shows 404', () => {
   const cases = [

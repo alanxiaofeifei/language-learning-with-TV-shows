@@ -263,7 +263,7 @@ function viewLang(langId) {
       h("p", { class: "eyebrow" }, langVariant(lang)),
       titleEl(langName(lang)),
       h("p", { class: "lede" }, vn ? "目前开放的教材是《Về nhà đi con》（回家吧，孩子）。同一部剧有两条轨道：12 周短期版，和按五年生活排的长期版。"
-        : t("lang.ledeShow", { title: shows[0]?.titleNative || "" }))),
+        : shows.length > 1 ? t("lang.ledeShows") : t("lang.ledeShow", { title: shows[0]?.titleNative || "" }))),
     h("div", { class: "track-grid" }, shows.map((show) =>
       h("a", { class: "track-card reveal", href: href({ page: "show", lang: langId, show: show.id }), "data-tilt": "1" },
         h("p", { class: "length" }, show.kind === "multi" ? t("lang.episodesN", { n: show.episodes }) : `${show.parts} 段 · 两条轨道`),

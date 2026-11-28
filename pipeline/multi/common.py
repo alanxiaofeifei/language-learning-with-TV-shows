@@ -54,6 +54,17 @@ SHOWS = {
         "srtPrefix": "SiliconValley",
         "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。重点关注现代科技和创业公司常用的英语词汇。",
     },
+    "desperate-housewives": {
+        "source": "text-only",
+        "tvsubtitlesId": 29,
+        "target": "en",
+        "langs": ["en", "zh", "vi"],
+        "translate": ["zh", "vi"],
+        "level": "CEFR",
+        "title": {"zh": "绝望主妇", "en": "Desperate Housewives"},
+        "srtPrefix": "DesperateHousewives",
+        "audience": "学习者一位是中文母语者（英语中上），另一位是越南语母语者。中文解释和越南语解释都要写好，各自用自然的母语。",
+    },
 }
 
 def cfg(show_id):
@@ -76,15 +87,16 @@ def episodes(show_id, work):
                 dur = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else None
                 out.append({"n": n, "code": f"EP{n:02d}", "youtubeId": vid, "duration": dur})
     else:
-        titles = {}
-        meta = os.path.join(work, "episodes.json")
-        if os.path.exists(meta):
-            for e in json.load(open(meta, encoding="utf-8")):
-                titles[e["code"]] = e.get("title", "")
-        codes = sorted(set(titles) | {os.path.basename(p).split(".")[0] for p in glob.glob(os.path.join(work, "srt", "S??E??.en.srt"))})
-        for n, code in enumerate(codes, 1):
-            srt = os.path.join(work, "srt", f"{code}.en.srt")
-            out.append({"n": n, "code": code, "title": titles.get(code, ""), "srt": srt if os.path.exists(srt) else None})
+        titles = {e["code"]: e.get("title", "") for e in load(os.path.join(work, "episodes.json"), [])}
+        srt_dir = os.path.join(work, "srt")
+        codes = sorted(set(titles) | {
+            os.path.basename(path).split(".")[0]
+            for path in glob.glob(os.path.join(srt_dir, "S??E??.en.srt"))
+        })
+        for code in codes:
+            srt = os.path.join(srt_dir, f"{code}.en.srt")
+            if os.path.isfile(srt):
+                out.append({"n": len(out) + 1, "code": code, "title": titles.get(code, ""), "srt": srt})
     return out
 
 def select(eps, only):

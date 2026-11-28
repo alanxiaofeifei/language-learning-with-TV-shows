@@ -1,6 +1,6 @@
-// Short (12 weeks / 84 days) and long-track outlines for the generic shows (都挺好, Friends).
+// Short (12 weeks / 84 days) and long-track outlines for the generic shows.
 // Everything here is our own teaching text; no show lines. Day plans are generated
-// deterministically from the episode count, so a show with 46 or 48 episodes gets the same shape.
+// deterministically from the episode count, with more close-study days for shorter shows.
 
 export const SHORT_DAYS = 84;
 export const SHORT_WEEKS_N = 12;
@@ -70,7 +70,7 @@ export const SHORT_WEEKS = {
     { zh: ["短语动词 I", "go out with、break up、hang out、figure out。"], vi: ["Cụm động từ I", "go out with, break up, hang out, figure out."] },
     { zh: ["约会与感情", "ask out、be into someone、move on。"], vi: ["Hẹn hò và tình cảm", "ask out, be into someone, move on."] },
     { zh: ["反讽与夸张", "听出 sarcasm：语调和 “Oh, great” 这类反话。"], vi: ["Mỉa mai và phóng đại", "Nhận ra sarcasm: ngữ điệu và câu nói ngược kiểu “Oh, great”."] },
-    { zh: ["工作与钱", "job、boss、rent、tip；Joey 的试镜、Rachel 的咖啡馆。"], vi: ["Công việc và tiền", "job, boss, rent, tip; buổi thử vai của Joey, quán cà phê của Rachel."] },
+    { zh: ["工作与钱", "job、boss、rent、tip；练习谈工作、房租和小费。"], vi: ["Công việc và tiền", "job, boss, rent, tip; luyện nói về công việc, tiền thuê nhà và tiền boa."] },
     { zh: ["短语动词 II 与习语", "第二遍关中文字幕，只在卡壳时打开。"], vi: ["Cụm động từ II và thành ngữ", "Lần xem thứ hai tắt phụ đề Việt/Trung, chỉ bật khi vướng."] },
     { zh: ["请求、拒绝与道歉", "Could you…、I'd rather not…、My bad。"], vi: ["Nhờ vả, từ chối, xin lỗi", "Could you…, I'd rather not…, My bad."] },
     { zh: ["家人与朋友", "家庭聚会、节日、婚礼里的常用表达。"], vi: ["Gia đình và bạn bè", "Cách nói thường gặp khi họp mặt gia đình, ngày lễ, đám cưới."] },
@@ -79,7 +79,7 @@ export const SHORT_WEEKS = {
   ],
 };
 
-// Long-track outlines: short, human-readable stages. Only the first show is built today.
+// Long-track outlines: short, human-readable stages. Available shows link to their short tracks.
 export const LONG_OUTLINES = {
   zh: [
     { show: "都挺好", status: "now", span: { zh: "第 1 年", vi: "Năm 1" },
@@ -90,11 +90,13 @@ export const LONG_OUTLINES = {
       goal: { zh: "台湾国语与用语差异、繁体字阅读、新闻和社会议题词汇；HSK 7–9 方向。", vi: "Tiếng Quốc ngữ Đài Loan và khác biệt từ ngữ, đọc chữ phồn thể, từ vựng tin tức và vấn đề xã hội; hướng HSK 7–9." } },
   ],
   en: [
-    { show: "Friends", status: "now", span: { zh: "第 1 年", vi: "Năm 1" },
+    { show: "Friends", showId: "friends", status: "now", span: { zh: "第 1 年 · 核心课程", vi: "Năm 1 · chương trình chính" },
       goal: { zh: "日常美式口语打底：缩读、短语动词、闲聊和约会话题。", vi: "Nền tảng khẩu ngữ Mỹ hằng ngày: nói tắt, cụm động từ, chuyện phiếm và hẹn hò." } },
-    { show: "Seinfeld", status: "planned", span: { zh: "第 2 年", vi: "Năm 2" },
-      goal: { zh: "更快的语速和观察式幽默；口语里的抱怨、吐槽和论证。", vi: "Tốc độ nhanh hơn và kiểu hài quan sát; phàn nàn, châm chọc và lập luận trong khẩu ngữ." } },
-    { show: "Desperate Housewives + Silicon Valley", status: "planned", span: { zh: "第 3 年 · 科技职场模块", vi: "Năm 3 · học phần công nghệ" },
-      goal: { zh: "郊区生活与叙事旁白；Silicon Valley 补科技公司、创业和工程师日常用语。", vi: "Đời sống ngoại ô và lời dẫn truyện; Silicon Valley bổ sung từ ngữ công ty công nghệ, khởi nghiệp và kỹ sư." } },
+    { show: "Seinfeld", showId: "seinfeld", status: "now", span: { zh: "第 2 年", vi: "Năm 2" },
+      goal: { zh: "练习快节奏的日常对话，听懂吐槽和反讽。", vi: "Luyện hội thoại đời thường tốc độ nhanh, nghe hiểu lời châm biếm và mỉa mai." } },
+    { show: "Desperate Housewives", showId: "desperate-housewives", status: "now", span: { zh: "第 3 年", vi: "Năm 3" },
+      goal: { zh: "学习郊区生活用语，练习理解叙事旁白。", vi: "Học từ ngữ về đời sống ngoại ô và luyện hiểu lời dẫn truyện." } },
+    { show: "Silicon Valley", showId: "silicon-valley", status: "now", span: { zh: "第 3 年 · 科技职场模块", vi: "Năm 3 · học phần công nghệ" },
+      goal: { zh: "聚焦 2020 年前的现代科技与创业词汇，涵盖软件工程、产品和融资。", vi: "Tập trung vào từ vựng công nghệ hiện đại và khởi nghiệp trước năm 2020, gồm kỹ thuật phần mềm, sản phẩm và gọi vốn." } },
   ],
 };

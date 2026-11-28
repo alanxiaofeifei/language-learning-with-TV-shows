@@ -1,4 +1,4 @@
-// Views for generic shows (kind "multi": 都挺好, Friends). Data: public episode list under
+// Views for generic shows (kind "multi"). Data: public episode list under
 // /shows/<id>/episodes.json, private lines/phrases under /private/shows/<id>/ (Access + Worker JWT).
 import { h, fmt, titleEl, progressBar } from "./lib/dom.js";
 import { SHOWS, href } from "./lib/catalog.js";
@@ -101,7 +101,7 @@ function watchPanel(show) {
   return h("section", { class: "panel notice reveal" },
     h("p", {}, t("show.textOnly")),
     show.watch ? h("div", { class: "actions" },
-      h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, `${t("show.watchOwn")} · ${show.watch.name}`)) : null,
+      h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, `${t("show.watchOwn")} · ${show.watch.name}`)) : h("p", {}, t("show.watchOwn")),
     h("p", { class: "muted" }, t("show.timesApprox")));
 }
 function explainOf(p) {
@@ -161,12 +161,15 @@ function phraseCard(show, p, ep) {
 async function viewShow(show) {
   const st = store(show.id);
   await Promise.all([loadPublic(show), loadIndex(show)]);
-  const next = (LONG_OUTLINES[show.language] || []).filter((s) => s.status !== "now").map((s) => s.show).join(" → ");
+  const stages = LONG_OUTLINES[show.language] || [];
+  const next = stages.filter((s) => s.status === "planned").map((s) => s.show).join(" → ");
+  const techStage = show.id === "silicon-valley" && stages.find((s) => s.showId === show.id);
   return [
     h("section", { class: "hero reveal" },
       h("p", { class: "eyebrow" }, [channelName(show), show.year].filter(Boolean).join(" · ")),
       titleEl(showTitle(show)),
-      h("p", { class: "lede" }, [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · "))),
+      h("p", { class: "lede" }, [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · ")),
+      techStage ? h("p", {}, pick(techStage.goal)) : null),
     h("div", { class: "track-grid" },
       h("a", { class: "track-card reveal", href: go(show, { page: "track", track: "short" }), "data-tilt": "1" },
         h("p", { class: "length" }, t("track.shortLength")), h("h2", {}, t("track.short")),
@@ -174,7 +177,7 @@ async function viewShow(show) {
         progressBar(st.doneDays.length, SHORT_DAYS), h("p", { class: "muted" }, t("show.progressDays", { d: st.doneDays.length }))),
       h("a", { class: "track-card long reveal", href: go(show, { page: "track", track: "long" }), "data-tilt": "1" },
         h("p", { class: "length" }, t("track.longLength")), h("h2", {}, t("track.long")),
-        h("p", {}, t("show.longBlurb", { next })))),
+        h("p", {}, show.language === "en" ? t("show.longBlurbEn") : t("show.longBlurb", { next })))),
     watchPanel(show),
     episodeList(show),
   ];
@@ -221,6 +224,7 @@ function episodeBlock(show, n, idx, { compact = false } = {}) {
       ...(e.srt || []).map((s) => h("a", { class: "btn", href: s.href, download: s.href.split("/").pop() }, t("ep.srt", { pair: s.langs.map((k) => t("langname." + k)).join("+") }))),
       compact ? h("a", { class: "btn ghost", href: go(show, { page: "ep", ep: n }) }, t("ep.transcript")) : null,
       h("button", { class: "btn ghost", type: "button", onclick: () => { st.watched[n] = !watched; persist(show.id); env.rerender({ transition: false, preserveScroll: true }); } }, watched ? t("ep.watched") : t("ep.markWatched"))),
+    !isYt(show) && !show.watch ? h("p", {}, t("show.watchOwn")) : null,
     !isYt(show) ? h("p", { class: "muted" }, t("show.timesApprox")) : null,
     phrases.length ? h("h3", { class: "section-title" }, t("ep.phrases", { n: phrases.length })) : null,
     h("div", { class: "cards" }, phrases.map((p) => phraseCard(show, p, e))))];
@@ -335,10 +339,10 @@ function viewPlan(show) {
 function viewLong(show) {
   const stages = LONG_OUTLINES[show.language] || [];
   return [
-    h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t("long.lede"))),
+    h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t(show.language === "en" ? "show.longBlurbEn" : "long.lede"))),
     h("div", { class: "stage-list" }, stages.map((s) => h("section", { class: "panel stage-card reveal" + (s.status === "now" ? " now" : "") },
       h("p", { class: "eyebrow" }, `${pick(s.span)} · ${s.status === "now" ? t("long.now") : t("long.planned")}`),
-      h("h2", {}, s.status === "now" ? h("a", { href: go(show, { page: "track", track: "short" }) }, s.show) : s.show),
+      h("h2", {}, s.status === "now" ? h("a", { href: go(SHOWS[s.showId || show.id], { page: "track", track: "short" }) }, s.show) : s.show),
       h("p", {}, pick(s.goal))))),
   ];
 }
