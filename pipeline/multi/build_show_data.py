@@ -37,6 +37,7 @@ def main():
             srts.append({"langs": [a, b], "href": f"{base}/srt/{name}"})
         for p in load(os.path.join(gen, code + ".phrases.json"), []) or []:
             p = dict(p); clip = p.pop("clip", None); p["clip"] = None
+            p["ep"] = ep["n"]
             if clip:
                 src = os.path.join(gen, "clips", code, clip)
                 if os.path.exists(src):

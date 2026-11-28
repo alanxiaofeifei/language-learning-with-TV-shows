@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SHOWS } from '../site/lib/catalog.js';
 import { buildShowDays, watchDays, nextShowDay, SHORT_WEEKS, LONG_OUTLINES, SHORT_DAYS } from '../site/lib/show-curriculum.js';
 
-for (const n of [46, 48, 82, 100, 1, 8, 17, 23]) {
+for (const n of [46, 48, 82, 100, 1, 8, 17, 22]) {
   test(`short track for ${n} episodes: 84 days, each episode watched exactly once, in order`, () => {
     const days = buildShowDays(n);
     assert.equal(days.length, SHORT_DAYS);
