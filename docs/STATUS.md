@@ -85,3 +85,7 @@ Review: Antigravity `agy --mode plan --model gemini-4-argon-high` on this batch 
 
 ## Deploy record: Spanish (2026-11-28 ~21:30 Asia/Saigon, UTC+7)
 - Merged PR #4 (`09dabfd`). Preview Worker version `ed3a51df-7e13-40a6-8e5d-ea6cf01a454c`; production `be3a7da1-f357-49e3-a6d0-9be5c65fbeb9`. Anonymous `/` and `/shows/<id>/episodes.json` 200; `/private/me.json` and `/private/shows/<id>/...` → 302 Access login on both hosts. Owner/Linh logged-in views not testable from this box.
+
+## Spanish lyric cleanup (2026-11-28)
+- Re-ingested both Spanish shows: Club de Cuervos 12,180 lines (was 12,221), La casa de las flores 10,875 (was 10,925); 180 and 331 phrase cards; all lines keep their zh translation (no LLM re-run); no ♪/#-lyric lines remain.
+- Known hardening gaps in the offline `fetch_subdl.py` (Codex review 4, not fixed; the fetch already ran on real data and was validated by episode/line counts and Spanish checks): raw bodies with a conflicting top-level filename or a redirect to another episode's basename; legacy path-wide rejection entries from an earlier commit are not versioned; a body containing the active key is not rejected; `reindex_phrases.py` matches by start/end/text and is ambiguous only if two cues share both timestamps.
