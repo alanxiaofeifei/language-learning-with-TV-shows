@@ -106,7 +106,7 @@ export const SHORT_WEEKS = {
     { zh: ["CEFR 复习", "按 CEFR 等级回顾卡片，为常用表达各写一个新例句。"], vi: ["Ôn theo CEFR", "Ôn thẻ theo cấp CEFR và đặt câu mới với các cách nói thông dụng."] },
   ],
   es: [
-    { zh: ["墨西哥西语入门", "先开西语原文 + 中文，习惯语速；注意拉美的 seseo：c、z 都读成 s。"], vi: ["Làm quen với tiếng Tây Ban Nha Mexico", "Bật nguyên văn tiếng Tây Ban Nha + bản dịch, quen tốc độ nói; để ý seseo ở Mỹ Latinh: c và z đều đọc như s."] },
+    { zh: ["墨西哥西语入门", "先开西语原文 + 中文，习惯语速；注意拉美的 seseo：z 以及 e、i 前的 c（cena、cielo、zapato）都读 /s/；a、o、u 前的 c 仍读 /k/（casa）。"], vi: ["Làm quen với tiếng Tây Ban Nha Mexico", "Bật nguyên văn tiếng Tây Ban Nha + bản dịch, quen tốc độ nói; để ý seseo ở Mỹ Latinh: z và c đứng trước e, i (cena, cielo, zapato) đều đọc là /s/; c đứng trước a, o, u vẫn đọc là /k/ (casa)."] },
     { zh: ["ser 与 estar", "身份、性质用 ser，状态、位置用 estar；把剧里的例子分成两栏。"], vi: ["ser và estar", "ser cho danh tính, bản chất; estar cho trạng thái, vị trí. Chia các ví dụ trong phim thành hai cột."] },
     { zh: ["称呼：tú、usted、ustedes", "观察人物何时用 tú，何时用 usted；拉美复数一律用 ustedes，不用 vosotros。"], vi: ["Xưng hô: tú, usted, ustedes", "Quan sát khi nào nhân vật dùng tú, khi nào dùng usted; ở Mỹ Latinh số nhiều luôn là ustedes, không dùng vosotros."] },
     { zh: ["常用不规则动词", "tener、ir、hacer、poder、querer 的现在时；用 ir a + 不定式说打算。"], vi: ["Động từ bất quy tắc thường gặp", "Thì hiện tại của tener, ir, hacer, poder, querer; dùng ir a + nguyên mẫu để nói dự định."] },

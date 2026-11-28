@@ -56,3 +56,13 @@ test('weekly themes and long outlines exist in zh and vi for multi-show language
   }
   assert.deepEqual(LONG_OUTLINES.en.map((s) => s.show), ['Friends', 'Seinfeld', 'Desperate Housewives', 'Silicon Valley']);
 });
+
+test('Spanish week 1 explains seseo correctly: z and c before e/i are /s/, c before a/o/u stays /k/', () => {
+  for (const ui of ['zh', 'vi']) {
+    const text = SHORT_WEEKS.es[0][ui][1];
+    assert.match(text, /seseo/);
+    assert.match(text, /\/s\//);
+    assert.match(text, /\/k\/.*casa|casa.*\/k\//);
+    assert.doesNotMatch(text, /c、z 都读成 s|c và z đều đọc như s/);
+  }
+});

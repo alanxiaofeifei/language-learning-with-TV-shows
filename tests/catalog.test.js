@@ -75,8 +75,8 @@ for (const [id, count, year] of [
 }
 
 for (const [id, count, year, zh] of [
-  ['club-de-cuervos', 12, '2018 · S04', '乌鸦俱乐部'],
-  ['la-casa-de-las-flores', 22, '2018 · S01–S02', '花之家'],
+  ['club-de-cuervos', 12, '2019 · S04', '乌鸦俱乐部'],
+  ['la-casa-de-las-flores', 22, '2018–2019 · S01–S02', '花之家'],
 ]) {
   test(`${id} is a text-only Spanish show with zh as the only translation`, () => {
     const show = SHOWS[id];
