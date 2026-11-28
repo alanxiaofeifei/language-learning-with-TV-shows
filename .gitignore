@@ -5,3 +5,9 @@ work/
 *.webm
 __pycache__/
 site/private/
+# Show text/audio never goes to Git (see scripts/check-no-private.sh)
+*.srt
+*.json3
+*.mp3
+!site/archive/5s-online/**/*.mp3
+*.tmp
