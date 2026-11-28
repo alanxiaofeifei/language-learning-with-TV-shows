@@ -597,7 +597,9 @@ function viewNotFound() {
 }
 
 async function render(route) {
-  if (route.show && isMultiShow(route.show) && route.page !== "notfound") return renderMulti(route);
+  // Tutorials are shared static pages; multi shows link to them via #/<lang>/<show>/vlc|download.
+  const tutorial = route.page === "vlc" || route.page === "download";
+  if (route.show && isMultiShow(route.show) && route.page !== "notfound" && !tutorial) return renderMulti(route);
   switch (route.page) {
     case "home": return viewHome();
     case "lang": return viewLang(route.lang);

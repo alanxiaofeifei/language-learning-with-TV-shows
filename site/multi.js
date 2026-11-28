@@ -93,17 +93,25 @@ function loginCard(show) {
     h("p", {}, t("login.body")),
     h("a", { class: "btn primary", href: "/private/login.html" }, t("login.btn")));
 }
+// Tutorial pages (VLC + bilingual SRT, downloading videos), kept inside this show's language/show route.
+export function tutorialLinks(show) {
+  return ["vlc", "download"].map((page) => ({ page, href: go(show, { page }), label: t("tutorial." + page) }));
+}
+const tutorialButtons = (show) => tutorialLinks(show).map((l) => h("a", { class: "btn ghost", href: l.href }, l.label));
 function watchPanel(show) {
   if (isYt(show)) {
     return h("section", { class: "panel notice reveal" },
       h("p", {}, t("show.officialNote", { channel: channelName(show) || "YouTube" })),
-      show.playlist ? h("div", { class: "actions" },
-        h("a", { class: "btn", href: `https://www.youtube.com/playlist?list=${show.playlist}`, target: "_blank", rel: "noopener" }, t("show.playlist"))) : null);
+      h("div", { class: "actions" },
+        show.playlist ? h("a", { class: "btn", href: `https://www.youtube.com/playlist?list=${show.playlist}`, target: "_blank", rel: "noopener" }, t("show.playlist")) : null,
+        ...tutorialButtons(show)));
   }
   return h("section", { class: "panel notice reveal" },
     h("p", {}, t("show.textOnly")),
-    show.watch ? h("div", { class: "actions" },
-      h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, `${t("show.watchOwn")} · ${show.watch.name}`)) : h("p", {}, t("show.watchOwn")),
+    show.watch ? null : h("p", {}, t("show.watchOwn")),
+    h("div", { class: "actions" },
+      show.watch ? h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, `${t("show.watchOwn")} · ${show.watch.name}`) : null,
+      ...tutorialButtons(show)),
     h("p", { class: "muted" }, t("show.timesApprox")));
 }
 export function readerLanguages(show, prefs, available = show.langs ?? [show.language]) {
@@ -236,6 +244,7 @@ function episodeBlock(show, n, idx, { compact = false } = {}) {
       e.youtubeId ? h("a", { class: "btn primary", href: ytUrl(e.youtubeId), target: "_blank", rel: "noopener" }, t("show.watchYoutube")) : null,
       !isYt(show) && show.watch ? h("a", { class: "btn primary", href: show.watch.url, target: "_blank", rel: "noopener" }, t("show.watchOwn")) : null,
       ...(e.srt || []).filter((s) => s.langs.every((k) => langs.includes(k))).map((s) => h("a", { class: "btn", href: s.href, download: s.href.split("/").pop() }, t("ep.srt", { pair: s.langs.map((k) => t("langname." + k)).join("+") }))),
+      ...tutorialButtons(show),
       compact ? h("a", { class: "btn ghost", href: go(show, { page: "ep", ep: n }) }, t("ep.transcript")) : null,
       h("button", { class: "btn ghost", type: "button", onclick: () => { st.watched[n] = !watched; persist(show.id); env.rerender({ transition: false, preserveScroll: true }); } }, watched ? t("ep.watched") : t("ep.markWatched"))),
     !isYt(show) && !show.watch ? h("p", {}, t("show.watchOwn")) : null,
