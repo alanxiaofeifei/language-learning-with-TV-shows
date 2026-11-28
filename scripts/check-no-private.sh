@@ -7,13 +7,14 @@ cd "$(git rev-parse --show-toplevel)"
 fail=0
 files=$( { git ls-files; git diff --cached --name-only --diff-filter=AM; } | sort -u)
 
-bad_paths=$(printf '%s\n' "$files" | grep -E '^site/private/|\.(srt|mp3|m4a|webm|json3)$' | grep -vE '^site/archive/5s-online/.*\.mp3$' || true)
+bad_paths=$(printf '%s\n' "$files" | grep -E '^site/private/|\.(srt|mp3|m4a|webm|json3)$|\.(lines|phrases)\.json$' | grep -vE '^site/archive/5s-online/.*\.mp3$' || true)
 if [ -n "$bad_paths" ]; then echo "private/media files tracked:"; echo "$bad_paths"; fail=1; fi
 
 GM="@gmail"; GM="$GM.com"                                  # split so this script does not match itself
 EMAIL='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
-hits=$(git grep -nIF "$GM" -- . 2>/dev/null || true)
-emails=$(git grep -nIE "$EMAIL" -- . ':!package-lock.json' 2>/dev/null | grep -vE '@example\.(test|com|org)' || true)
+# Scan both the working tree and the staged index (staged content can differ from the working tree).
+hits=$( { git grep -nIF "$GM" -- . 2>/dev/null; git grep --cached -nIF "$GM" -- . 2>/dev/null | sed 's/^/(staged) /'; } || true)
+emails=$( { git grep -nIE "$EMAIL" -- . ':!package-lock.json' 2>/dev/null; git grep --cached -nIE "$EMAIL" -- . ':!package-lock.json' 2>/dev/null | sed 's/^/(staged) /'; } | grep -vE '@example\.(test|com|org)' || true)
 if [ -n "$hits$emails" ]; then echo "email addresses in tracked files:"; printf '%s\n%s\n' "$hits" "$emails" | sed '/^$/d'; fail=1; fi
 
 [ $fail -eq 0 ] && echo "check-no-private: ok ($(printf '%s\n' "$files" | wc -l) files)"

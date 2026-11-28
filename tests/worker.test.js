@@ -1,16 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { verifyAccessJwt, verifyAccess, prefsFor, DEFAULT_PREFS } from '../src/worker.js';
+import worker, { verifyAccessJwt, verifyAccess, prefsFor, DEFAULT_PREFS, keys, resetJwksCache } from '../src/worker.js';
 
 const team = 'https://team.cloudflareaccess.com', aud = 'aud123';
 const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 
-async function signed(payload, kid = 'k1') {
+// header overrides the JOSE header (e.g. drop kid); jwkKid overrides the kid on the published JWK.
+async function signed(payload, kid = 'k1', { header, jwkKid } = {}) {
   const { publicKey, privateKey } = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
-  const head = enc({ alg: 'RS256', kid }), body = enc(payload);
+  const head = enc(header || { alg: 'RS256', kid }), body = enc(payload);
   const sig = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, new TextEncoder().encode(head + '.' + body))).toString('base64url');
-  const jwk = { ...(await crypto.subtle.exportKey('jwk', publicKey)), kid };
-  return { token: `${head}.${body}.${sig}`, fetchKeys: async () => [jwk] };
+  const jwk = { ...(await crypto.subtle.exportKey('jwk', publicKey)) };
+  if (jwkKid !== null) jwk.kid = jwkKid === undefined ? kid : jwkKid;
+  return { token: `${head}.${body}.${sig}`, jwk, fetchKeys: async () => [jwk] };
 }
 
 test('accepts a valid Access JWT and rejects wrong aud, expiry, issuer or signature', async () => {
@@ -107,4 +109,62 @@ test('GET /private/me.json returns prefs for the signed-in user, never the email
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test('rejects missing/non-string kid and non-numeric exp/nbf even with a valid signature', async () => {
+  const now = 1_000_000;
+  const base = { aud: [aud], iss: team, exp: now + 60 };
+  // No kid in the header, and a published JWK that also lacks kid: undefined === undefined must not match.
+  const noKid = await signed(base, 'k1', { header: { alg: 'RS256' }, jwkKid: null });
+  assert.equal(await verifyAccess(noKid.token, { team, aud, now, fetchKeys: noKid.fetchKeys }), null);
+  const numKid = await signed(base, 'k1', { header: { alg: 'RS256', kid: 7 }, jwkKid: 7 });
+  assert.equal(await verifyAccess(numKid.token, { team, aud, now, fetchKeys: numKid.fetchKeys }), null);
+  const emptyKid = await signed(base, '', { header: { alg: 'RS256', kid: '' } });
+  assert.equal(await verifyAccess(emptyKid.token, { team, aud, now, fetchKeys: emptyKid.fetchKeys }), null);
+  const strExp = await signed({ ...base, exp: String(now + 60) });
+  assert.equal(await verifyAccess(strExp.token, { team, aud, now, fetchKeys: strExp.fetchKeys }), null);
+  const noExp = await signed({ aud: [aud], iss: team });
+  assert.equal(await verifyAccess(noExp.token, { team, aud, now, fetchKeys: noExp.fetchKeys }), null);
+  const strNbf = await signed({ ...base, nbf: String(now) });
+  assert.equal(await verifyAccess(strNbf.token, { team, aud, now, fetchKeys: strNbf.fetchKeys }), null);
+  const futureNbf = await signed({ ...base, nbf: now + 600 });
+  assert.equal(await verifyAccess(futureNbf.token, { team, aud, now, fetchKeys: futureNbf.fetchKeys }), null);
+  const okNbf = await signed({ ...base, nbf: now - 10 });
+  assert.ok(await verifyAccess(okNbf.token, { team, aud, now, fetchKeys: okNbf.fetchKeys }));
+  const hs = await signed(base, 'k1', { header: { alg: 'HS256', kid: 'k1' } });
+  assert.equal(await verifyAccess(hs.token, { team, aud, now, fetchKeys: hs.fetchKeys }), null);
+});
+
+test('unknown kid triggers one forced JWKS refresh (key rotation)', async () => {
+  const now = 1_000_000;
+  const rotated = await signed({ aud: [aud], iss: team, exp: now + 60 }, 'new-kid');
+  const old = await signed({ aud: [aud], iss: team, exp: now + 60 }, 'old-kid');
+  const calls = [];
+  const fetchKeys = async (_t, opts = {}) => { calls.push(!!opts.refresh); return opts.refresh ? [old.jwk, rotated.jwk] : [old.jwk]; };
+  assert.ok(await verifyAccess(rotated.token, { team, aud, now, fetchKeys }));
+  assert.deepEqual(calls, [false, true]);
+  calls.length = 0;
+  assert.ok(await verifyAccess(old.token, { team, aud, now, fetchKeys }));
+  assert.deepEqual(calls, [false], 'known kid: no refresh');
+});
+
+test('keys() caches for an hour, refetches on refresh only after a minute, and drops kid-less JWKs', async () => {
+  resetJwksCache();
+  let n = 0, list = [{ kid: 'a', kty: 'RSA' }, { kty: 'RSA' }];
+  const fetchImpl = async () => { n++; return new Response(JSON.stringify({ keys: list })); };
+  const t0 = 5_000_000;
+  assert.deepEqual((await keys(team, { now: t0, fetchImpl })).map((k) => k.kid), ['a']);
+  await keys(team, { now: t0 + 30_000, fetchImpl });
+  await keys(team, { now: t0 + 30_000, refresh: true, fetchImpl });
+  assert.equal(n, 1, 'refresh within 60 s reuses the cache');
+  list = [{ kid: 'a' }, { kid: 'b' }];
+  assert.deepEqual((await keys(team, { now: t0 + 61_000, refresh: true, fetchImpl })).map((k) => k.kid), ['a', 'b']);
+  assert.equal(n, 2);
+  await keys(team, { now: t0 + 61_000 + 3_500_000, fetchImpl });
+  assert.equal(n, 2, 'still within the 1 h TTL');
+  await keys(team, { now: t0 + 61_000 + 3_600_001, fetchImpl });
+  assert.equal(n, 3);
+  await keys('https://other.cloudflareaccess.com', { now: t0 + 61_000 + 3_600_002, fetchImpl });
+  assert.equal(n, 4, 'cache is per team domain');
+  resetJwksCache();
 });

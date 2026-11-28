@@ -1,17 +1,25 @@
 // Static site + defence-in-depth for /private/*: Cloudflare Access protects the path at the edge,
 // and this Worker re-checks the Access JWT so private assets never leak through another hostname.
-let jwksCache = { at: 0, keys: [] };
+let jwksCache = { at: 0, team: "", keys: [] };
+const JWKS_TTL_MS = 3600_000;
+const JWKS_MIN_REFRESH_MS = 60_000; // an unknown kid forces a refetch, at most once a minute
 
 const b64urlToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=")), (c) => c.charCodeAt(0));
 const decodeJson = (s) => JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
 
-async function keys(team) {
-  if (Date.now() - jwksCache.at < 3600_000 && jwksCache.keys.length) return jwksCache.keys;
-  const r = await fetch(`${team}/cdn-cgi/access/certs`);
+// refresh=true (unknown kid, e.g. after an Access key rotation) refetches unless the cache is < 1 min old.
+export async function keys(team, { refresh = false, now = Date.now(), fetchImpl = fetch } = {}) {
+  const age = now - jwksCache.at;
+  const fresh = jwksCache.team === team && jwksCache.keys.length > 0;
+  if (fresh && age < (refresh ? JWKS_MIN_REFRESH_MS : JWKS_TTL_MS)) return jwksCache.keys;
+  const r = await fetchImpl(`${team}/cdn-cgi/access/certs`);
   if (!r.ok) throw new Error("certs " + r.status);
-  jwksCache = { at: Date.now(), keys: (await r.json()).keys || [] };
+  const list = (await r.json()).keys;
+  jwksCache = { at: now, team, keys: Array.isArray(list) ? list.filter((k) => k && typeof k.kid === "string" && k.kid) : [] };
   return jwksCache.keys;
 }
+
+export function resetJwksCache() { jwksCache = { at: 0, team: "", keys: [] }; }
 
 function tokenFrom(request) {
   const h = request.headers.get("Cf-Access-Jwt-Assertion");
@@ -27,10 +35,15 @@ export async function verifyAccess(token, { team, aud, now = Date.now() / 1000, 
   if (parts.length !== 3) return null;
   let header, payload;
   try { header = decodeJson(parts[0]); payload = decodeJson(parts[1]); } catch { return null; }
-  if (!header || !payload || header.alg !== "RS256") return null;
+  if (!header || typeof header !== "object" || !payload || typeof payload !== "object") return null;
+  if (header.alg !== "RS256" || typeof header.kid !== "string" || !header.kid) return null;
   const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!auds.includes(aud) || payload.iss !== team || !(payload.exp > now) || (payload.nbf && payload.nbf > now + 60)) return null;
-  const jwk = (await fetchKeys(team)).find((k) => k.kid === header.kid);
+  if (!auds.includes(aud) || payload.iss !== team) return null;
+  if (typeof payload.exp !== "number" || !(payload.exp > now)) return null;
+  if (payload.nbf != null && (typeof payload.nbf !== "number" || payload.nbf > now + 60)) return null;
+  const find = (list) => (Array.isArray(list) ? list : []).find((k) => k && typeof k.kid === "string" && k.kid === header.kid);
+  let jwk = find(await fetchKeys(team));
+  if (!jwk) jwk = find(await fetchKeys(team, { refresh: true }));
   if (!jwk) return null;
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlToBytes(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1]));

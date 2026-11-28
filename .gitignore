@@ -9,5 +9,7 @@ site/private/
 *.srt
 *.json3
 *.mp3
+*.lines.json
+*.phrases.json
 !site/archive/5s-online/**/*.mp3
 *.tmp
