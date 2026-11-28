@@ -77,6 +77,34 @@ export const SHORT_WEEKS = {
     { zh: ["只看英文字幕", "关掉中文 / 越南语，只留英文。"], vi: ["Chỉ phụ đề tiếng Anh", "Tắt tiếng Trung / tiếng Việt, chỉ giữ tiếng Anh."] },
     { zh: ["总复习与自测", "复习卡清零；挑 3 集无字幕看，写下听懂的梗。"], vi: ["Ôn tập và tự kiểm tra", "Ôn hết thẻ; chọn 3 tập xem không phụ đề, ghi lại các câu đùa hiểu được."] },
   ],
+  ja: [
+    { zh: ["假名与汉字", "对照原文与假名，标出还不熟悉的读音。"], vi: ["Kana và kanji", "Đối chiếu nguyên văn với kana, đánh dấu cách đọc chưa quen."] },
+    { zh: ["助词", "比较 は、が、を 在句子里的作用。"], vi: ["Trợ từ", "So sánh vai trò của は, が và を trong câu."] },
+    { zh: ["礼貌体与普通体", "观察不同关系下如何切换说法。"], vi: ["Thể lịch sự và thể thường", "Quan sát cách đổi lối nói theo quan hệ giữa các nhân vật."] },
+    { zh: ["请求", "整理 て 形和委婉请求的用法。"], vi: ["Nhờ vả", "Ghi lại cách dùng thể て và cách nhờ vả nhẹ nhàng."] },
+    { zh: ["家务与分工", "用自己的话写一份家务分工。"], vi: ["Việc nhà và phân công", "Tự viết cách phân chia việc nhà."] },
+    { zh: ["省略", "根据上下文补出省略的主语。"], vi: ["Lược bỏ", "Dựa vào ngữ cảnh để tìm chủ ngữ bị lược."] },
+    { zh: ["职场", "区分同事之间的闲聊和正式用语。"], vi: ["Công sở", "Phân biệt lời trò chuyện giữa đồng nghiệp và cách nói trang trọng."] },
+    { zh: ["理由与转折", "比较 から、ので、けど 的语气。"], vi: ["Lý do và chuyển ý", "So sánh sắc thái của から, ので và けど."] },
+    { zh: ["推测", "用自己的例句练习表达不确定性。"], vi: ["Phỏng đoán", "Tự đặt câu để luyện cách diễn đạt sự không chắc chắn."] },
+    { zh: ["道歉与回应", "按人物关系整理道歉和回应的表达。"], vi: ["Xin lỗi và đáp lời", "Nhóm cách xin lỗi và đáp lời theo quan hệ giữa các nhân vật."] },
+    { zh: ["独立阅读", "先关掉假名和译文，遇到生词再打开。"], vi: ["Đọc độc lập", "Tắt kana và bản dịch, chỉ bật lại khi gặp từ khó."] },
+    { zh: ["JLPT 复习", "按 JLPT 等级回顾卡片，并用重点句型造句。"], vi: ["Ôn theo JLPT", "Ôn thẻ theo cấp JLPT và đặt câu với mẫu câu chính."] },
+  ],
+  fr: [
+    { zh: ["法国法语入门", "先对照原文和译文，标出常用表达。"], vi: ["Làm quen với tiếng Pháp ở Pháp", "Đối chiếu nguyên văn và bản dịch, đánh dấu các cách nói thường gặp."] },
+    { zh: ["称呼", "观察人物何时用 tu，何时用 vous。"], vi: ["Xưng hô", "Quan sát khi nào nhân vật dùng tu và khi nào dùng vous."] },
+    { zh: ["口语否定", "标出省略 ne 的句子，写出完整形式。"], vi: ["Phủ định trong khẩu ngữ", "Đánh dấu câu lược ne và viết lại dạng đầy đủ."] },
+    { zh: ["提问", "比较口语问句和较正式的倒装问句。"], vi: ["Đặt câu hỏi", "So sánh câu hỏi khẩu ngữ với câu đảo ngữ trang trọng hơn."] },
+    { zh: ["时间与叙事", "比较复合过去时和未完成过去时。"], vi: ["Thời gian và kể chuyện", "So sánh passé composé và imparfait."] },
+    { zh: ["代词", "找出 le、lui、y、en 指代的对象。"], vi: ["Đại từ", "Tìm đối tượng mà le, lui, y và en thay thế."] },
+    { zh: ["请求与指令", "把直接指令改写成委婉请求。"], vi: ["Yêu cầu và chỉ dẫn", "Viết lại mệnh lệnh trực tiếp thành lời nhờ lịch sự."] },
+    { zh: ["语域", "比较熟人之间与正式场合的措辞。"], vi: ["Ngữ vực", "So sánh cách nói giữa người quen với cách nói trong tình huống trang trọng."] },
+    { zh: ["描述与推测", "用自己的话描述人物知道什么、猜到什么。"], vi: ["Mô tả và suy đoán", "Dùng lời của mình để mô tả nhân vật biết gì và đoán gì."] },
+    { zh: ["复述", "用连接词和时间词写一段简短复述。"], vi: ["Kể lại", "Viết đoạn kể lại ngắn, dùng từ nối và từ chỉ thời gian."] },
+    { zh: ["只看法语", "关闭译文，读完一段后核对理解。"], vi: ["Chỉ đọc tiếng Pháp", "Tắt bản dịch, đọc một đoạn rồi đối chiếu cách hiểu."] },
+    { zh: ["CEFR 复习", "按 CEFR 等级回顾卡片，为常用表达各写一个新例句。"], vi: ["Ôn theo CEFR", "Ôn thẻ theo cấp CEFR và đặt câu mới với các cách nói thông dụng."] },
+  ],
 };
 
 // Long-track outlines: short, human-readable stages. Available shows link to their short tracks.
@@ -98,5 +126,17 @@ export const LONG_OUTLINES = {
       goal: { zh: "学习郊区生活用语，练习理解叙事旁白。", vi: "Học từ ngữ về đời sống ngoại ô và luyện hiểu lời dẫn truyện." } },
     { show: "Silicon Valley", showId: "silicon-valley", status: "now", span: { zh: "第 3 年 · 科技职场模块", vi: "Năm 3 · học phần công nghệ" },
       goal: { zh: "聚焦 2020 年前的现代科技与创业词汇，涵盖软件工程、产品和融资。", vi: "Tập trung vào từ vựng công nghệ hiện đại và khởi nghiệp trước năm 2020, gồm kỹ thuật phần mềm, sản phẩm và gọi vốn." } },
+  ],
+  ja: [
+    { show: "逃げるは恥だが役に立つ", showId: "nigeru-wa-haji", status: "now", span: { zh: "第 1 年", vi: "Năm 1" },
+      goal: { zh: "练习现代日常日语，积累 JLPT 词汇和句型。", vi: "Luyện tiếng Nhật đời thường và tích lũy từ vựng, mẫu câu JLPT." } },
+    { show: "后续日剧待定", showVi: "Phim Nhật tiếp theo chưa chọn", status: "planned", span: { zh: "后续阶段", vi: "Giai đoạn sau" },
+      goal: { zh: "用后续剧集扩展话题和语域。", vi: "Mở rộng chủ đề và ngữ vực qua các phim tiếp theo." } },
+  ],
+  fr: [
+    { show: "Lupin", showId: "lupin", status: "now", span: { zh: "第 1 年", vi: "Năm 1" },
+      goal: { zh: "以法国法语打底，按 CEFR 练习口语表达和叙事。", vi: "Xây nền tảng tiếng Pháp ở Pháp, luyện cách nói và kể chuyện theo CEFR." } },
+    { show: "魁北克剧待定", showVi: "Phim Québec chưa chọn", status: "planned", span: { zh: "后续阶段", vi: "Giai đoạn sau" },
+      goal: { zh: "学习魁北克法语的词汇、发音和口语差异。", vi: "Học khác biệt về từ vựng, phát âm và khẩu ngữ Québec." } },
   ],
 };

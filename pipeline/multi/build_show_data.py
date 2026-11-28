@@ -3,7 +3,7 @@
 Usage: python pipeline/multi/build_show_data.py SHOW_ID WORKDIR
 Output: index.json (episodes + all phrase cards), eps/<CODE>.json (lines), srt/*.srt, audio/<CODE>/*.mp3.
 youtube-official: zh+vi and zh+en SRT per episode (timing = the official YouTube upload).
-text-only: en+zh and en+vi SRT (timing approximate). Rebuilds the show folder from scratch each run.
+text-only: target+zh and target+vi SRT (timing approximate). Rebuilds the show folder from scratch each run.
 """
 import json, os, shutil, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,7 +29,7 @@ def main():
         srts = []
         stem = f"{c['srtPrefix']}_{code}" + (f"_{ep['youtubeId']}" if ep.get("youtubeId") else "")
         t = c["target"]
-        pairs = [("zh", "vi"), ("zh", "en")] if t == "zh" else [("en", "zh"), ("en", "vi")]
+        pairs = [("zh", "vi"), ("zh", "en")] if t == "zh" else [(t, k) for k in c["translate"]]
         for a, b in pairs:
             if not any(L.get(b) for L in lines): continue
             name = f"{stem}.{a}-{b}.srt"

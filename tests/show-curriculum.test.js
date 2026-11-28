@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SHOWS } from '../site/lib/catalog.js';
 import { buildShowDays, watchDays, nextShowDay, SHORT_WEEKS, LONG_OUTLINES, SHORT_DAYS } from '../site/lib/show-curriculum.js';
 
-for (const n of [46, 48, 82, 100, 1, 8, 17, 23]) {
+for (const n of [46, 48, 82, 100, 1, 8, 17, 23, 11, 5]) {
   test(`short track for ${n} episodes: 84 days, each episode watched exactly once, in order`, () => {
     const days = buildShowDays(n);
     assert.equal(days.length, SHORT_DAYS);
@@ -27,12 +27,18 @@ test('46 vs 48 episodes: deep days fill the gap; next day follows progress', () 
   assert.throws(() => buildShowDays(0));
 });
 
-test('weekly themes and long outlines exist in zh and vi for both new languages', () => {
-  for (const lang of ['zh', 'en']) {
+test('weekly themes and long outlines exist in zh and vi for multi-show languages', () => {
+  for (const lang of ['zh', 'en', 'ja', 'fr']) {
     assert.equal(SHORT_WEEKS[lang].length, 12);
     for (const w of SHORT_WEEKS[lang]) for (const ui of ['zh', 'vi']) { assert.equal(w[ui].length, 2); assert.ok(w[ui][0] && w[ui][1]); }
     assert.equal(LONG_OUTLINES[lang][0].status, 'now');
     for (const s of LONG_OUTLINES[lang]) assert.ok(s.goal.zh && s.goal.vi && s.span.zh && s.span.vi);
+  }
+  for (const lang of ['ja', 'fr']) {
+    const [current, followUp] = LONG_OUTLINES[lang];
+    assert.equal(SHOWS[current.showId].language, lang);
+    assert.equal(followUp.status, 'planned');
+    assert.ok(followUp.show && followUp.showVi);
   }
   assert.deepEqual(LONG_OUTLINES.zh.map((s) => s.show), ['都挺好', '欢乐颂 1', '我们与恶的距离']);
   for (const { show, showId, status } of LONG_OUTLINES.en) {

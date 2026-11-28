@@ -1,0 +1,26 @@
+{
+  "show": "lupin",
+  "source": "text-only",
+  "episodes": [
+    {
+      "n": 1,
+      "code": "S01E01"
+    },
+    {
+      "n": 2,
+      "code": "S01E02"
+    },
+    {
+      "n": 3,
+      "code": "S01E03"
+    },
+    {
+      "n": 4,
+      "code": "S01E04"
+    },
+    {
+      "n": 5,
+      "code": "S01E05"
+    }
+  ]
+}

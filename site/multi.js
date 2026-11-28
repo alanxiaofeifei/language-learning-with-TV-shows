@@ -141,7 +141,7 @@ function phraseCard(show, p, ep) {
   const front = h("div", { class: "face front" },
     h("div", { class: "card-top" }, p.level ? h("span", { class: "tag level" }, p.level) : null, h("span", { class: "tag" }, t("card.at", { ep: isYt(show) ? t("ep.title", { n: p.ep }) : p.code, t: fmt(p.start) }))),
     h("p", { class: "vi phrase-" + show.language }, p.phrase),
-    p.py ? h("p", { class: "reading" }, p.py) : null,
+    (p.py || p.reading) ? h("p", { class: "reading" }, p.py || p.reading) : null,
     h("div", { class: "actions" }, ...clipButtons(p),
       h("button", { class: "btn primary", type: "button", onclick: (e) => { e.stopPropagation(); setFlipped(card, front, back, true); } }, t("card.show"))),
     h("p", { class: "flip-hint" }, t("card.hint")));
@@ -162,7 +162,7 @@ async function viewShow(show) {
   const st = store(show.id);
   await Promise.all([loadPublic(show), loadIndex(show)]);
   const stages = LONG_OUTLINES[show.language] || [];
-  const next = stages.filter((s) => s.status === "planned").map((s) => s.show).join(" → ");
+  const next = stages.filter((s) => s.status === "planned").map((s) => uiLang() === "vi" ? s.showVi || s.show : s.show).join(" → ");
   const techStage = show.id === "silicon-valley" && stages.find((s) => s.showId === show.id);
   return [
     h("section", { class: "hero reveal" },
@@ -203,6 +203,7 @@ function defaultToggles(show) {
   const ex = env.prefs().explainLang;
   const on = { [show.language]: true };
   if (show.langs.includes("py")) on.py = true;
+  if (show.langs.includes("reading")) on.reading = true;
   if (show.language !== ex && show.langs.includes(ex)) on[ex] = true;
   else if (show.langs.includes("en") && show.language !== "en") on.en = true;
   return on;
@@ -260,7 +261,7 @@ async function viewEp(show, n) {
     const ts = isYt(show) && e.youtubeId
       ? h("a", { class: "ts", href: ytUrl(e.youtubeId, L.start), target: "_blank", rel: "noopener" }, fmt(L.start))
       : h("span", { class: "ts", title: t("show.timesApprox") }, fmt(L.start));
-    list.append(h("li", { "data-langs": langs.filter((k) => L[k]).join(" ") }, ts, h("div", { class: "stack" }, langs.filter((k) => L[k]).map((k) => h("span", { class: "l-" + k, lang: k === "py" ? "zh-Latn-pinyin" : k }, L[k])))));
+    list.append(h("li", { "data-langs": langs.filter((k) => L[k]).join(" ") }, ts, h("div", { class: "stack" }, langs.filter((k) => L[k]).map((k) => h("span", { class: "l-" + k, lang: k === "py" ? "zh-Latn-pinyin" : k === "reading" ? "ja-Hira" : k }, L[k])))));
   }
   applyToggles();
   out.push(h("section", { class: "panel reveal" }, h("h2", {}, t("ep.transcript")),
@@ -342,7 +343,7 @@ function viewLong(show) {
     h("section", { class: "hero reveal" }, h("p", { class: "eyebrow" }, t("track.longLength")), titleEl(t("long.title")), h("p", { class: "lede" }, t(show.language === "en" ? "show.longBlurbEn" : "long.lede"))),
     h("div", { class: "stage-list" }, stages.map((s) => h("section", { class: "panel stage-card reveal" + (s.status === "now" ? " now" : "") },
       h("p", { class: "eyebrow" }, `${pick(s.span)} · ${s.status === "now" ? t("long.now") : t("long.planned")}`),
-      h("h2", {}, s.status === "now" ? h("a", { href: go(SHOWS[s.showId || show.id], { page: "track", track: "short" }) }, s.show) : s.show),
+      h("h2", {}, s.status === "now" ? h("a", { href: go(SHOWS[s.showId || show.id], { page: "track", track: "short" }) }, s.show) : uiLang() === "vi" ? s.showVi || s.show : s.show),
       h("p", {}, pick(s.goal))))),
   ];
 }
@@ -382,7 +383,7 @@ async function viewReview(show) {
   const e = epList(show).find((x) => x.n === p.ep);
   const isNew = !st.srs[id]; const x = explainOf(p);
   const back = h("div", { class: "back", hidden: true },
-    h("p", { class: "vi" }, p.phrase), p.py ? h("p", { class: "reading" }, p.py) : null,
+    h("p", { class: "vi" }, p.phrase), (p.py || p.reading) ? h("p", { class: "reading" }, p.py || p.reading) : null,
     x.meaning ? h("p", { class: "zh" }, h("b", {}, x.meaning)) : null, x.explain ? h("p", { class: "usage" }, x.explain) : null,
     ...sourceLines(show, p), h("div", { class: "actions" }, timeLink(show, e, p.start)),
     h("div", { class: "actions grades" }, ["again", "hard", "good", "easy"].map((g) =>

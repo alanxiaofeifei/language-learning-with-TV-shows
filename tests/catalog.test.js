@@ -5,10 +5,10 @@ import {
   languageById, showsForLanguage, href, matchRoute, isComingLanguage, safeDecode, isMultiShow, showDataBase,
 } from '../site/lib/catalog.js';
 
-test('catalog: vi, zh, en ready; fr/ja/es/yue placeholders with planned picks', () => {
+test('catalog: vi, zh, en, fr, ja ready; es/yue placeholders with planned picks', () => {
   assert.deepEqual(LANGUAGES.map((l) => l.id), ['vi', 'zh', 'en', 'fr', 'ja', 'es', 'yue']);
   const ready = LANGUAGES.filter((l) => l.status === 'ready').map((l) => l.id);
-  assert.deepEqual(ready, ['vi', 'zh', 'en']);
+  assert.deepEqual(ready, ['vi', 'zh', 'en', 'fr', 'ja']);
   assert.deepEqual(languageById('vi').shows, ['ve-nha-di-con']);
   assert.deepEqual(languageById('zh').shows, ['dou-ting-hao']);
   assert.deepEqual(languageById('en').shows, ['friends', 'seinfeld', 'silicon-valley', 'desperate-housewives']);
@@ -19,8 +19,9 @@ test('catalog: vi, zh, en ready; fr/ja/es/yue placeholders with planned picks', 
     assert.ok(lang.planned.length >= 1, lang.id + ' lists planned picks');
   }
   const titles = (id) => languageById(id).planned.map((p) => p.title).join('|');
-  assert.match(titles('fr'), /Lupin/);
-  assert.match(titles('ja'), /逃げるは恥だが役に立つ/);
+  assert.match(titles('fr'), /魁北克/);
+  assert.deepEqual(languageById('fr').shows, ['lupin']);
+  assert.deepEqual(languageById('ja').shows, ['nigeru-wa-haji']);
   assert.match(titles('es'), /Club de Cuervos/); assert.match(titles('es'), /La casa de las flores/);
   assert.match(titles('yue'), /愛·回家之開心速遞/);
   assert.deepEqual(languageById('en').planned, []);
@@ -81,6 +82,10 @@ test('new show routes round-trip and cross-language shows 404', () => {
     { page: 'parts', lang: 'en', show: 'friends' },
     { page: 'review', lang: 'en', show: 'friends' },
     { page: 'ep', lang: 'en', show: 'friends', ep: 1 },
+    { page: 'ep', lang: 'ja', show: 'nigeru-wa-haji', ep: 11 },
+    { page: 'track', lang: 'ja', show: 'nigeru-wa-haji', track: 'long' },
+    { page: 'ep', lang: 'fr', show: 'lupin', ep: 5 },
+    { page: 'track', lang: 'fr', show: 'lupin', track: 'long' },
   ];
   for (const rec of cases) {
     const got = matchRoute(href(rec));
