@@ -12,7 +12,7 @@ from llm import chat_json, USED
 NAMES = {"zh": "简体中文（自然口语，像国内字幕组，不要翻译腔）", "vi": "越南语（北越河内自然口语，称呼按人物关系用 anh/chị/em/mình/cậu/tớ 等）",
          "en": "English (natural spoken)"}
 
-SOURCE_NAMES = {"ja": "日语", "fr": "法国法语"}
+SOURCE_NAMES = {"ja": "日语", "fr": "法国法语", "es": "拉美西班牙语（墨西哥）"}
 
 def system(c, langs):
     want = "；".join(f"{k} = {NAMES[k]}" for k in langs)

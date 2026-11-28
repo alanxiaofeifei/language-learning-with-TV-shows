@@ -6,7 +6,8 @@ _ZH_DROP = re.compile(r"[\s，。！？、,.!?…\"'“”‘’]")
 
 def norm(s, zh, language=None):
     """ja: normalize width and drop spaces, punctuation and symbols.
-    zh: drop spaces and punctuation. Other: lowercase, curly -> straight apostrophe,
+    zh: drop spaces and punctuation. es: casefold, strip accents except ñ, every other non [a-z0-9ñ]
+    char becomes a space. Other: lowercase, curly -> straight apostrophe,
     every other non [a-z0-9'] char becomes a space, runs of spaces collapse to one."""
     s = s or ""
     if language == "ja":
@@ -15,6 +16,12 @@ def norm(s, zh, language=None):
     if language == "fr":
         folded = unicodedata.normalize("NFKD", s.casefold())
         s = "".join(ch for ch in folded if not unicodedata.category(ch).startswith("M")).replace("œ", "oe").replace("æ", "ae")
+    if language == "es":
+        # Case/accent/punctuation-lenient (¿¡«» drop out), but ñ stays a letter of its own: "año" != "ano".
+        folded = unicodedata.normalize("NFD", s.casefold())
+        folded = folded.replace("n\u0303", "\u00f1")
+        s = "".join(ch for ch in folded if not unicodedata.category(ch).startswith("M"))
+        return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9ñ ]", " ", s)).strip()
     if zh: return _ZH_DROP.sub("", s)
     s = s.lower().replace("\u2019", "'").replace("\u2018", "'")
     if language == "fr":
@@ -26,4 +33,4 @@ def matches(key, line_norm, zh):
     ("go" must not match inside "ago" or "go's")."""
     if not key or not line_norm: return False
     if zh: return key in line_norm
-    return re.search(r"(?<![a-z0-9'])" + re.escape(key) + r"(?![a-z0-9'])", line_norm) is not None
+    return re.search(r"(?<![a-z0-9ñ'])" + re.escape(key) + r"(?![a-z0-9ñ'])", line_norm) is not None

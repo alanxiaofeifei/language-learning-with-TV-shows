@@ -4,6 +4,7 @@ Usage: python pipeline/multi/extract_phrases_multi.py SHOW_ID WORKDIR [--only EP
 Writes gen/<CODE>.phrases.json. Skips episodes that already have one unless --force.
 Phrases must occur in their source line (else re-located in nearby lines, else dropped).
 zh shows get pypinyin readings by rule; levels are HSK bands (HSK1..HSK6, HSK7-9) JLPT (N5..N1), or CEFR (A1..C2).
+fr/es (CEFR) match whole words only and have no reading field; ja matches substrings and keeps a kana reading.
 """
 import argparse, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -19,9 +20,9 @@ def system(c, n):
     if c["target"] == "zh":
         what = ("从中文字幕里挑出最值得学的词语、固定搭配、口语句式或成语（2–12 个汉字，从原句里原样截取）。"
                 "level 用新 HSK 等级：HSK1…HSK6 或 HSK7-9（取该表达整体的难度）。优先 HSK4 以上、考试和日常都常用的；避开人名和剧情专有词。")
-    elif c["target"] in ("ja", "fr"):
+    elif c["target"] in ("ja", "fr", "es"):
         japanese = c["target"] == "ja"
-        example = "日语" if japanese else "法语"
+        example = {"ja": "日语", "fr": "法语", "es": "西班牙语"}[c["target"]]
         level = "JLPT：N5/N4/N3/N2/N1" if japanese else "CEFR：A1/A2/B1/B2/C1/C2"
         what = (f"从{example}字幕里原样截取实用的日常口语表达、固定搭配或句式。"
                 f"level 用 {level}，按整个表达的难度分级。避开人名和剧情专有词。")

@@ -1,7 +1,8 @@
 """Text-only show: target-language SRT -> lines per episode.
 
 Usage: python pipeline/multi/ingest_srt.py SHOW_ID WORKDIR [--only S01E01,S01E02] [--force]
-Strips HTML/ASS tags and music notes. Also strips Japanese cue labels and French bracketed cues.
+Strips HTML/ASS tags and music notes. Also strips Japanese cue labels, French bracketed cues and, for Spanish,
+[música] / (risas) cues, lyric lines and ALL-CAPS "NOMBRE:" speaker labels (¿ ¡ are kept).
 Japanese transcript readings use pykakasi (install it in the pipeline Python environment).
 Writes WORKDIR/gen/SxxEyy.lines.json = [{i,start,end,<target>}] (ms). If the file exists, keeps existing
 translations (zh/vi) for lines whose source text is unchanged; skips entirely unless --force.
@@ -11,6 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import cfg, episodes, select, gen_dir, save, load
 
 TS = re.compile(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)")
+# Spanish ALL-CAPS speaker label at line start (after an optional dialogue dash): "PAULINA:", "DON SALVADOR:".
+ES_SPEAKER = re.compile(r"^((?:[-–—]\s*)?)[A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ.'’ -]*[A-ZÁÉÍÓÚÜÑ.]:(?:\s+|$)")
 
 def ms(h, m, s, f): return ((int(h) * 60 + int(m)) * 60 + int(s)) * 1000 + int(f.ljust(3, "0")[:3])
 
@@ -32,9 +35,14 @@ def read_srt(path, target="en"):
         out.append({"start": ms(*m.groups()[:4]), "end": ms(*m.groups()[4:]), target: " ".join(body)})
     return out
 
+# ALL-CAPS speaker label at line start (after an optional dialogue dash): "PAULINA:", "DON SALVADOR:".
+ES_SPEAKER = re.compile(r"^((?:[-–—]\s*)?)[A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ.'’ -]*[A-ZÁÉÍÓÚÜÑ.]:(?:\s+|$)")
+
 def clean_text(r, target="en"):
     r = re.sub(r"<[^>]+>", "", r)           # <i>, <font ...>
     r = re.sub(r"\{\\[^}]*\}", "", r)       # {\an8}
+    if target == "es" and re.match(r"\s*(?:[-–—]\s*)?[♪♫]", r):
+        return ""                           # sung lyrics / music-only line
     r = r.replace("♪", "").replace("♫", "")
     # "#" marks sung lyrics ("# Smelly cat #"), but also appears in dialogue ("We're #1!", "Apt. #20"):
     # drop it only when it wraps the whole line or stands alone between spaces.
@@ -44,8 +52,11 @@ def clean_text(r, target="en"):
     r = r.strip()
     if target == "ja":
         r = re.sub(r"^(?:（[^（）]*）\s*)+", "", r)
-    elif target == "fr":
+    elif target in ("fr", "es"):
         r = re.sub(r"\[[^\]\n]*\]", "", r).strip()
+        if target == "es":
+            r = re.sub(r"\([^()\n]*\)", "", r).strip()               # (risas), (suspira)
+            r = re.sub(ES_SPEAKER, r"\1", r).strip()                    # "- PAULINA: Hola" -> "- Hola"
         if re.fullmatch(r"[-–—]+", r):
             return ""
     return re.sub(r"\s+", " ", r).strip()
