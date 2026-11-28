@@ -324,6 +324,7 @@ export function href(parts) {
     case "scenes": return parts.cat ? `${base}/scenes/${parts.cat}` : `${base}/scenes`;
     case "search": return parts.q != null && parts.q !== "" ? `${base}/search/${encodeURIComponent(parts.q)}` : `${base}/search`;
     case "vlc": return `${base}/vlc`;
+    case "download": return `${base}/download`;
     case "lesson": return `${base}/lesson/${parts.lesson}`;
     default: return "#/";
   }
@@ -348,6 +349,7 @@ const NAMED = [
   [new RegExp(`^#/(${LANG})/(${SHOW})/scenes(?:/(\\w+))?$`), (m) => ({ page: "scenes", lang: m[1], show: m[2], cat: m[3] || null })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/search(?:/(.*))?$`), (m) => ({ page: "search", lang: m[1], show: m[2], q: m[3] ? safeDecode(m[3]) : "" })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/vlc$`), (m) => ({ page: "vlc", lang: m[1], show: m[2] })],
+  [new RegExp(`^#/(${LANG})/(${SHOW})/download$`), (m) => ({ page: "download", lang: m[1], show: m[2] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})/lesson/(\\w+)$`), (m) => ({ page: "lesson", lang: m[1], show: m[2], lesson: m[3] })],
   [new RegExp(`^#/(${LANG})/(${SHOW})$`), (m) => ({ page: "show", lang: m[1], show: m[2] })],
 ];
@@ -361,6 +363,7 @@ const ALIASES = [
   [/^#\/scenes(?:\/(\w+))?$/, (m) => ({ page: "scenes", lang: "vi", show: DEFAULT_SHOW, cat: m[1] || null, alias: true })],
   [/^#\/search(?:\/(.*))?$/, (m) => ({ page: "search", lang: "vi", show: DEFAULT_SHOW, q: m[1] ? safeDecode(m[1]) : "", alias: true })],
   [/^#\/vlc$/, () => ({ page: "vlc", lang: "vi", show: DEFAULT_SHOW, alias: true })],
+  [/^#\/download$/, () => ({ page: "download", lang: "vi", show: DEFAULT_SHOW, alias: true })],
   [/^#\/lesson\/(\w+)$/, (m) => ({ page: "lesson", lang: "vi", show: DEFAULT_SHOW, lesson: m[1], alias: true })],
 ];
 

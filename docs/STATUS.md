@@ -2,6 +2,9 @@
 
 Updated 2026-11-28 19:20 (Asia/Saigon, UTC+7).
 
+## Download tutorial (feat/download-tutorial, 2026-11-28)
+- New public page `site/download.html` (how to save the official YouTube videos with Ghost Downloader 3 or SnapAny and pair them with our `.srt` in VLC), route `#/vi/ve-nha-di-con/download` (alias `#/download`), nav link 「下载视频」 and a 「怎么下载视频」 button on each part page; `site/vlc.html` links to it. Multi-show pages have no VLC/tutorial links, so none were added there.
+
 ## Spanish shows (feat/es-shows, 2026-11-28) — data built
 - Spanish (Mexican / Latin-American baseline) is a ready language in the catalog: 《Club de Cuervos》 乌鸦俱乐部 S04 (12 eps, short-track pick, `2019 · S04`) and 《La casa de las flores》 花之家 S01–S02 (13 + 9 = 22 eps, long-track pick, `2018–2019 · S01–S02`). Text only, es + zh reader, CEFR cards, zh translations and explanations only (no Vietnamese). A Spain-Spanish show stays a planned later stage.
 - Club de Cuervos S01–S03 have no Spanish subtitles on SubDL, so only S04 is included.

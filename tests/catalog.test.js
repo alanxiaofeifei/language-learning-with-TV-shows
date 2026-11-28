@@ -145,6 +145,7 @@ test('href and matchRoute round-trip for language, show and track pages', () => 
     { page: 'scenes', lang: 'vi', show: 've-nha-di-con', cat: 'food' },
     { page: 'search', lang: 'vi', show: 've-nha-di-con', q: 'bao nhiêu' },
     { page: 'vlc', lang: 'vi', show: 've-nha-di-con' },
+    { page: 'download', lang: 'vi', show: 've-nha-di-con' },
     { page: 'lesson', lang: 'vi', show: 've-nha-di-con', lesson: 'tones' },
   ];
   for (const rec of cases) {
@@ -166,6 +167,11 @@ test('legacy hashes alias to the Vietnamese show and unknown routes 404', () => 
   assert.equal(matchRoute('#/day/12').day, 12);
   assert.equal(matchRoute('#/part/3').part, 3);
   assert.equal(matchRoute('#/scenes/work').cat, 'work');
+  assert.equal(href({ page: 'download', lang: 'vi', show: 've-nha-di-con' }), '#/vi/ve-nha-di-con/download');
+  for (const page of ['vlc', 'download']) {
+    const r = matchRoute(`#/${page}`);
+    assert.deepEqual([r.page, r.lang, r.show, r.alias], [page, 'vi', 've-nha-di-con', true]);
+  }
   const bad = matchRoute('#/en/ve-nha-di-con');
   assert.equal(bad.page, 'notfound');
   assert.equal(bad.show, undefined);
