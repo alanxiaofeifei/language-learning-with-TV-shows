@@ -69,6 +69,18 @@ test('reader preferences hide Vietnamese translations and preserve target langua
   assert.deepEqual(defaultToggles(show, { ...alan, explainLang: 'vi' }), { en: true, zh: true });
   assert.deepEqual(defaultToggles(show, linh), { en: true, vi: true });
   assert.deepEqual(readerLanguages(SHOWS.lupin, linh, ['fr', 'zh', 'vi']), ['fr', 'zh']);
+  for (const id of ['club-de-cuervos', 'la-casa-de-las-flores']) {
+    assert.deepEqual(readerLanguages(SHOWS[id], alan, ['es', 'zh', 'vi']), ['es', 'zh']);
+    assert.deepEqual(readerLanguages(SHOWS[id], linh, ['es', 'zh', 'vi']), ['es', 'zh']);
+    assert.deepEqual(defaultToggles(SHOWS[id], alan), { es: true, zh: true });
+    assert.deepEqual(defaultToggles(SHOWS[id], linh), { es: true, zh: true });
+  }
+  // Linh's profile lists only zh/en, so the Spanish card stays hidden for her (display only, not authorization).
+  const linhHome = homeLanguages(LANGUAGES, effectivePrefs({ visibleLangs: ['zh', 'en'], hideLangs: [] }));
+  assert.deepEqual(linhHome.map((l) => l.id), ['zh', 'en']);
+  assert.ok(homeLanguages(LANGUAGES, alan).some((l) => l.id === 'es'));
+  assert.equal(DICT.zh['langname.es'], '西班牙语'); assert.equal(DICT.vi['langname.es'], 'Tây Ban Nha');
+  assert.match(DICT.zh['show.longBlurbEs'], /La casa de las flores/);
   assert.deepEqual(readerLanguages(SHOWS['ve-nha-di-con'], alan, ['vi', 'zh']), ['vi', 'zh']);
 
   const card = { meaning_vi: 'vi meaning', explain_vi: 'vi explanation', usage_vi: 'vi usage', explain_zh: 'zh explanation' };

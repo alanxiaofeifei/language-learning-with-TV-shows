@@ -249,7 +249,7 @@ html.motion-ready .chip.done { animation: pop .35s ease; }
 .transcript.multi .l-py, .transcript.multi .l-reading { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 14px; color: var(--accent-deep); }
 .transcript.multi .l-vi, .transcript.multi .stack > span:not(:first-child):not(.l-py):not(.l-reading) { color: var(--muted); }
 .transcript.multi.hide-zh .l-zh, .transcript.multi.hide-py .l-py, .transcript.multi.hide-vi .l-vi, .transcript.multi.hide-en .l-en,
-.transcript.multi.hide-ja .l-ja, .transcript.multi.hide-fr .l-fr,
+.transcript.multi.hide-ja .l-ja, .transcript.multi.hide-fr .l-fr, .transcript.multi.hide-es .l-es,
 .transcript.multi.hide-reading .l-reading { display: none; }
 .stage-card.now { border-color: var(--accent); }
 .user-menu { position: relative; }
