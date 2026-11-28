@@ -50,3 +50,6 @@ Updated 2026-11-28 12:00 (Asia/Saigon, UTC+7).
 ## Next
 - When Alan picks shows for the other languages, add a show record in `catalog.js` and run the pipeline into that show’s private data prefix.
 - Optional quality pass on P04, P07, P46 (no verified clips); export/import of per-browser progress.
+
+## Deploy record (2026-11-28)
+- Preview `b8893249-847e-4300-9a94-69b90e250fa5`, production `c62cf161-d39f-4403-b94c-6baa08d88a81` (main 8a62627). `USER_PREFS` secret set on both workers. Anonymous `/` 200; `/private`, `/private/me.json`, `/private/shows/*` → 302 Access login. Owner/Linh logged-in views not testable from the box.
