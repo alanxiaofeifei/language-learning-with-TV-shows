@@ -205,8 +205,7 @@ function defaultToggles(show) {
   return on;
 }
 
-async function episodeBlock(show, n, { compact = false } = {}) {
-  const idx = await loadIndex(show);
+function episodeBlock(show, n, idx, { compact = false } = {}) {
   if (!idx) return [loginCard(show)];
   const st = store(show.id);
   const e = epList(show).find((x) => x.n === n);
@@ -228,9 +227,8 @@ async function episodeBlock(show, n, { compact = false } = {}) {
 }
 
 async function viewEp(show, n) {
-  await Promise.all([loadPublic(show), loadIndex(show)]);
-  const out = await episodeBlock(show, n);
-  const idx = c(show.id).idx;
+  const [, idx] = await Promise.all([loadPublic(show), loadIndex(show)]);
+  const out = episodeBlock(show, n, idx);
   const e = epList(show).find((x) => x.n === n);
   const total = epList(show).length;
   const nav = h("div", { class: "actions reveal" },
@@ -298,14 +296,17 @@ async function viewDay(show, n) {
   const days = buildShowDays(show.episodes);
   const d = days[n - 1];
   if (!d) return [h("p", {}, t("day.none"))];
-  await Promise.all([loadPublic(show), loadIndex(show)]);
+  const [, idx] = await Promise.all([loadPublic(show), loadIndex(show)]);
   const done = st.doneDays.includes(d.day);
   const wk = weekTheme(show, d.week);
   const out = [h("p", { class: "eyebrow reveal" }, t("day.eyebrow", { w: d.week, theme: wk.title })), h("h1", { class: "reveal" }, t("day.title", { n: d.day }))];
   if (d.kind === "intro") out.push(h("section", { class: "panel reveal" }, h("h2", {}, t("day.introTitle")), h("p", {}, t("day.introBody")), h("p", { class: "muted" }, wk.focus)), watchPanel(show));
   else out.push(h("section", { class: "panel reveal" }, h("p", {}, t("day." + d.kind)), h("p", { class: "muted" }, wk.focus),
     d.kind === "review" ? h("a", { class: "btn primary", href: go(show, { page: "review" }) }, t("nav.review")) : null));
-  if (d.kind === "watch" || d.kind === "deep") for (const e of d.eps) out.push(...(await episodeBlock(show, e, { compact: true })));
+  if (d.kind === "watch" || d.kind === "deep") {
+    if (!idx) out.push(loginCard(show));
+    else for (const e of d.eps) out.push(...episodeBlock(show, e, idx, { compact: true }));
+  }
   if (d.kind === "review" && d.eps.length) out.push(h("div", { class: "chips reveal" }, d.eps.map((n) => h("a", { class: "chip", href: go(show, { page: "ep", ep: n }) }, epLabel(show, epList(show).find((x) => x.n === n) || { n, code: "#" + n })))));
   out.push(h("div", { class: "actions reveal" },
     h("button", { class: "btn primary", type: "button", onclick: () => {
@@ -372,7 +373,7 @@ async function viewReview(show) {
   const wrap = [h("h1", { class: "reveal" }, t("review.title")), h("p", { class: "muted reveal" }, t("review.stats", { due: q.due.length, fresh: q.fresh.length }) + " ",
     h("select", { "aria-label": t("review.newLimit"), onchange: (e) => { st.newLimit = +e.target.value; persist(show.id); env.rerender({ transition: false, preserveScroll: true }); } },
       [5, 10, 15, 20, 30].map((v) => h("option", { value: v, selected: v === st.newLimit }, v))), " " + t("review.perDay"))];
-  if (!id) return [...wrap, h("section", { class: "panel reveal" }, h("p", {}, t("review.empty")), h("a", { class: "btn", href: go(show, { page: "track", track: "short" }) }, t("review.backTrack")))];
+  if (!id) return [...wrap, h("section", { class: "panel reveal" }, h("p", {}, t("review.empty")), h("a", { class: "btn", href: go(show, { page: "track", track: multiTrack(show.id) }) }, t("review.backTrack")))];
   const p = idx.phrases.find((x) => x.id === id);
   const e = epList(show).find((x) => x.n === p.ep);
   const isNew = !st.srs[id]; const x = explainOf(p);
