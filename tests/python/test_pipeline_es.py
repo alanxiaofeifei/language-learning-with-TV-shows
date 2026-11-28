@@ -122,6 +122,23 @@ class SpanishShows(unittest.TestCase):
             self.assertEqual(data.splitlines()[2:4], [line["es"], line["zh"]])
             self.assertEqual(sorted(p.name for p in (out / "srt").iterdir()), ["ClubDeCuervos_S04E01.es-zh.srt"])
 
+    def test_episodes_ignore_srts_outside_configured_seasons(self):
+        """Leftover SRTs (another season, E13 of a 12-episode season) never shift the public numbering."""
+        with TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            (work / "srt").mkdir()
+            for code in ("S01E01", "S04E00", "S04E01", "S04E12", "S04E13"):
+                (work / f"srt/{code}.es.srt").touch()
+            save(str(work / "episodes.json"), [{"code": "S04E14", "title": "x"}, {"code": "S04E12", "title": "Final"}])
+            eps = episodes("club-de-cuervos", str(work))
+            self.assertEqual([(e["n"], e["code"]) for e in eps], [(1, "S04E01"), (2, "S04E12")])
+            self.assertEqual(eps[1]["title"], "Final")
+            with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {"4": 13}}):   # JSON-style string keys
+                self.assertEqual([e["code"] for e in episodes("club-de-cuervos", str(work))],
+                                 ["S04E01", "S04E12", "S04E13"])
+            with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {}}):          # no count: every SRT
+                self.assertEqual(len(episodes("club-de-cuervos", str(work))), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

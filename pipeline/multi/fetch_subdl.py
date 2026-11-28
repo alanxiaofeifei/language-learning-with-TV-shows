@@ -15,25 +15,30 @@ no hearing-impaired files (hi flag, *hi.srt, *.hi.*, spaHi, SDH). A raw (non-zip
 when the metadata names an eligible .srt for that exact episode; a season-pack zip must contain a member named
 for that episode. A file is accepted only if it parses to >= MIN_CUES cues and reads as the requested language
 (stopword ratio >= MIN_RATIO over >= MIN_WORDS words, and clearly more Spanish than Italian/Portuguese markers).
-Missing (404/410), oversized or unreadable files fall through to the next candidate; quota/auth failures
-(401/403/429) and the request/download budgets stop the run.
+A raw body also needs a file name (metadata name or URL basename) ending in .srt whose SxxEyy / NxNN marker, if
+any, is the requested episode. Missing (404/410), oversized or unreadable files fall through to the next
+candidate; quota/auth failures (401/403/429) and the request/download budgets stop the run. Redirects are never
+followed automatically: each hop is charged to the same budget as the request, at most MAX_REDIRECTS hops are
+taken, redirect bodies are never read, and only https targets on *.subdl.com are followed.
 
 Writes WORKDIR/srt/SxxEyy.<lang>.srt (LF line endings, CR-only files normalised), WORKDIR/subdl-manifest.json
 {code: {release, file, season_pack}} and WORKDIR/subdl-rejected.json: opaque ids (sha256 of language, path and
 member) for files that failed and for (language, pack, season, episode) pairs whose pack was already inspected,
-so later runs never re-download them; delete it to retry. Existing SRTs are never re-downloaded; seasons that
+so later runs never re-download them; delete it to retry. A cache from an older version (plain paths) is
+rewritten as opaque ids as soon as it is loaded. Existing SRTs are never re-downloaded; seasons that
 are already complete make no API call. Both budgets are charged before every HTTP attempt, retries included:
 stops before MAX_DOWNLOADS downloads (anonymous limit is 300/day/IP) and MAX_API_REQUESTS API requests.
-Responses are capped at MAX_BODY_BYTES, subtitle files / archive members at MAX_MEMBER_BYTES, and only a few
+Responses are capped at MAX_BODY_BYTES, subtitle files / archive members at MAX_MEMBER_BYTES (a member's declared
+size is checked before it is opened, and only stored/deflated members are read), and only a few
 season packs are kept in memory (PACK_CACHE_ITEMS / PACK_CACHE_BYTES). Prints one JSON summary line.
 """
 import argparse, hashlib, io, json, os, re, sys, time
 from collections import OrderedDict
 from dataclasses import dataclass
 from urllib.error import HTTPError
-from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
-from zipfile import ZipFile
+from urllib.parse import urlencode, urljoin, urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import cfg, load, save
@@ -45,6 +50,9 @@ USER_AGENT = "curl/8.5.0"          # SubDL answers 403 to Python's default User-
 MAX_DOWNLOADS = 250
 MAX_API_REQUESTS = 1900            # free plan: 2,000/day
 MAX_PAGES = 10
+MAX_REDIRECTS = 3                  # hops per request, each charged to the request's budget
+REDIRECT_HOST_SUFFIX = ".subdl.com"
+ZIP_METHODS = {ZIP_STORED, ZIP_DEFLATED}   # bzip2 / lzma members could expand past the cap inside zipfile
 MAX_BODY_BYTES = 20 * 1024 * 1024  # any single HTTP response (download or API page)
 MAX_MEMBER_BYTES = 5 * 1024 * 1024 # a raw subtitle file or one decompressed archive member
 PACK_CACHE_ITEMS, PACK_CACHE_BYTES = 4, 60 * 1024 * 1024
@@ -94,6 +102,47 @@ class TooLarge(Exception):
     """A response or archive member is over its byte cap."""
 
 
+class Redirect(Exception):
+    """A 3xx response (never followed by urllib). str() holds no URL: the target may echo the key."""
+
+    def __init__(self, code, location):
+        super().__init__(f"HTTP {code} redirect")
+        self.code, self.location = code, str(location or "")
+
+
+class NoRedirect(HTTPRedirectHandler):
+    """Turn every redirect into Redirect without reading the body; Client._fetch decides whether to follow."""
+
+    def http_error_302(self, req, fp, code, msg, headers):
+        location = headers.get("Location") or headers.get("URI") or ""
+        if fp is not None:
+            fp.close()
+        raise Redirect(code, location)
+
+    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
+
+
+_OPENER = build_opener(NoRedirect)
+
+
+def urlopen(req, timeout):
+    return _OPENER.open(req, timeout=timeout)
+
+
+def redirect_target(current, location):
+    """Absolute https URL on *.subdl.com for a Location header, else CandidateError (target never shown)."""
+    try:
+        target = urljoin(current, location)
+        parts = urlsplit(target)
+        host, port = (parts.hostname or "").lower(), parts.port
+    except ValueError:
+        raise CandidateError("redirect to an invalid URL") from None
+    if (parts.scheme != "https" or not host.endswith(REDIRECT_HOST_SUFFIX) or port not in (None, 443)
+            or parts.username is not None or parts.password is not None):
+        raise CandidateError("redirect to a disallowed host")
+    return target
+
+
 def redact(text, key):
     text = str(text)
     if key:
@@ -123,21 +172,29 @@ def exhausted_id(lang, path, season, episode):
 
 
 def load_rejected(path, lang):
-    """Opaque ids; entries from older versions ("/path" or "/path!member") are converted on load."""
-    out = set()
-    for entry in load(path, []) or []:
+    """Opaque ids; entries from older versions ("/path" or "/path!member") are converted on load, and the
+    file is rewritten at once (atomically) so no plain upstream path stays on disk, even if nothing is fetched."""
+    raw, out = load(path, []) or [], set()
+    for entry in raw:
         entry = str(entry)
         if entry.startswith("sha256:"):
             out.add(entry)
         elif entry.startswith("/"):
             p, _, member = entry.partition("!")
             out.add(file_id(lang, p, member))
+    if not isinstance(raw, list) or raw != sorted(out):
+        if os.path.exists(path):
+            save(path, sorted(out))
     return out
 
 
 def clean_path(url):
-    """Path of a SubDL download URL without host, query or fragment (the query may carry the API key)."""
-    path = urlsplit(str(url or "")).path
+    """Path of a SubDL download URL without host, query or fragment (the query may carry the API key).
+    None for a URL urllib cannot parse (the error text would echo it, so it is dropped silently)."""
+    try:
+        path = urlsplit(str(url or "")).path
+    except ValueError:
+        return None
     if not path.startswith("/"):
         path = "/" + path
     return path if PATH.fullmatch(path) and ".." not in path else None
@@ -166,6 +223,14 @@ def episode_from_name(name):
         if m:
             return int(m[1]), int(m[2])
     return None, None
+
+
+def raw_name_ok(name, season, episode):
+    """A raw (non-zip) body may stand for this episode only under an .srt name whose episode marker, if any,
+    is this exact episode (S04E02.srt never serves E01)."""
+    name = str(name or "")
+    s, e = episode_from_name(name)
+    return name.lower().endswith(".srt") and not is_hi(name) and s in (None, season) and e in (None, episode)
 
 
 def http_get(url, headers, limit=MAX_BODY_BYTES):
@@ -260,17 +325,21 @@ def candidates(subtitles, season, episode, lang):
                     continue
                 if f.get("language") and str(f["language"]).upper() != lang:
                     continue
-                fs, fe = episode_from_name(name)
-                fe = as_int(f.get("episode")) or fe
-                if (fs not in (None, season)) or (fe != episode if pack else fe not in (None, episode)):
+                ns, ne = episode_from_name(name)
+                me = as_int(f.get("episode"))
+                # Name marker and metadata must both agree when present; a pack file needs at least one.
+                if ns not in (None, season) or ne not in (None, episode) or me not in (None, episode):
+                    continue
+                if pack and episode not in (ne, me):
                     continue
                 path = clean_path(f.get("url"))
                 if path:
-                    bucket.append(Candidate(path, release, name, pack, episode, season, raw_ok=True))
+                    bucket.append(Candidate(path, release, name, pack, episode, season,
+                                            raw_ok=raw_name_ok(name, season, episode)))
         else:
             path = clean_path(sub.get("url"))
             if path:
-                raw_ok = not pack and path.lower().endswith(".srt") and not is_hi(path)
+                raw_ok = not pack and raw_name_ok(os.path.basename(path), season, episode)
                 bucket.append(Candidate(path, release, "", pack, episode, season, raw_ok=raw_ok))
     return direct + packs
 
@@ -296,12 +365,24 @@ class Client:
         self.downloads += 1
 
     def _fetch(self, url, headers, charge):
-        """GET with up to 3 attempts; `charge` runs before every attempt (budgets count real requests)."""
+        """GET with up to 3 attempts; `charge` runs before every attempt and every redirect hop (budgets count
+        real requests). Redirects: at most MAX_REDIRECTS hops, https *.subdl.com targets only."""
         host = urlsplit(url).netloc
         for attempt in range(3):
-            charge()
+            current = url
             try:
-                data = self.get(url, headers)
+                for hop in range(MAX_REDIRECTS + 1):
+                    charge()
+                    try:
+                        data = self.get(current, headers)
+                        break
+                    except Redirect as r:
+                        location = r.location
+                    if hop == MAX_REDIRECTS:
+                        raise CandidateError(f"more than {MAX_REDIRECTS} redirects from {host}")
+                    current = redirect_target(current, location)
+            except SubdlError:      # budgets, refused redirects: never retried
+                raise
             except HTTPError as exc:
                 code = exc.code
                 if code in MISSING_STATUS:
@@ -314,7 +395,7 @@ class Client:
                 raise CandidateError(f"response over {self.max_bytes // 2**20} MB") from None
             except Exception as exc:  # URLError, timeouts, stub errors: never let the raw URL escape
                 if attempt == 2:
-                    msg = str(exc).replace(url, host)
+                    msg = str(exc).replace(current, host).replace(url, host)
                     raise SubdlError(redact(f"{type(exc).__name__}: {msg}", self.key)) from None
             else:
                 if len(data) > self.max_bytes:
@@ -362,7 +443,16 @@ class Unreadable(Exception):
     """The archive itself cannot be opened (no member names in the message)."""
 
 
+class Unsupported(Exception):
+    """An archive member compressed with a method we do not read (only stored / deflate)."""
+
+
 def read_capped(z, info):
+    """Member bytes; the declared size and compression method are checked before the member is opened."""
+    if info.file_size > MAX_MEMBER_BYTES:
+        raise TooLarge()
+    if info.compress_type not in ZIP_METHODS:
+        raise Unsupported()
     with z.open(info) as f:
         raw = f.read(MAX_MEMBER_BYTES + 1)
     if len(raw) > MAX_MEMBER_BYTES:
@@ -428,6 +518,8 @@ def select_episode(client, subs, season, episode, lang, rejected, log=print):
                     raw = read()
                 except TooLarge:
                     why = f"over {MAX_MEMBER_BYTES // 2**20} MB"
+                except Unsupported:
+                    why = "unsupported compression"
                 except Exception:   # bad CRC, truncated, encrypted, unsupported compression...
                     why = "unreadable archive member"
                 else:

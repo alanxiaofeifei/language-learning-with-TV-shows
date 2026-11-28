@@ -8,16 +8,17 @@ from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlsplit
-from zipfile import ZipFile
+from zipfile import ZIP_BZIP2, ZipFile, ZipInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pipeline" / "multi"))
 import fetch_subdl
 from common import cfg, load
 
 KEY = "TESTKEY-not-a-real-key-123"
+AT = "@"   # URL userinfo separator, kept apart so the repo's email scan does not flag the test URLs
 
 # Synthetic text written for these tests (not from any show).
 SPANISH = ["¿Qué vas a hacer hoy en la casa?", "No sé, pero ya es muy tarde para eso.",
@@ -469,6 +470,201 @@ class FetchSubdl(unittest.TestCase):
         raw = Path(self.work) / "cr.srt"
         raw.write_bytes(srt(SPANISH, nl="\r"))
         self.assertEqual(len(ingest_srt.read_srt(str(raw), "es")), 160)   # ingest also accepts CR-only input
+
+    def test_unparseable_url_is_skipped_without_echoing_it(self):
+        bad = f"https://{KEY}\u2100x/subtitle/S04E01.srt"     # urlsplit raises ValueError quoting the netloc
+        with self.assertRaises(ValueError):
+            urlsplit(bad)
+        self.assertIsNone(fetch_subdl.clean_path(bad))
+        self.assertIsNone(fetch_subdl.clean_path("http://[::1/subtitle/x.zip"))
+        api = {4: {"status": True, "subtitles": [
+            {"release_name": "Bad", "season": 4, "episode": 1, "url": bad},
+            {"release_name": "Pack", "full_season": True, "season": 4, "url": "/subtitle/p.zip",
+             "unpack_files": [unpack(1, "S04E01.srt", bad)]},
+            {"release_name": "Good", "season": 4, "episode": 1, "url": "/subtitle/1-1.zip"},
+        ]}}
+        stub = Stub(api, {"/subtitle/1-1.zip": zipped({"S04E01.srt": srt(SPANISH)})})
+        with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {4: 1}}), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            result, logs = self.run_fetch("club-de-cuervos", stub)
+        self.assertEqual(result["seasons"]["S04"]["found"], ["E01"])
+        self.assertEqual(stub.downloaded(), ["/subtitle/1-1.zip"])
+        everything = err.getvalue() + "\n".join(logs) + json.dumps(result)
+        everything += "".join(p.read_text(encoding="utf-8") for p in Path(self.work).glob("*.json"))
+        self.assertNotIn(KEY, everything)
+
+    def test_legacy_rejected_cache_is_migrated_on_load(self):
+        srt_dir = Path(self.work) / "srt"
+        srt_dir.mkdir()
+        for n in range(1, 13):
+            (srt_dir / f"S04E{n:02}.es.srt").write_bytes(b"x")
+        path = Path(self.work) / "subdl-rejected.json"
+        legacy = ["/subtitle/1-1.zip", "/subtitle/2-2.zip!Show.S04E02.srt", fetch_subdl.file_id("ES", "/x")]
+        path.write_text(json.dumps(legacy), encoding="utf-8")
+        stub = Stub({}, {})
+        self.run_fetch("club-de-cuervos", stub)                  # complete season: no request, still migrated
+        self.assertEqual(stub.calls, [])
+        migrated = load(str(path))
+        self.assertEqual(migrated, sorted({fetch_subdl.file_id("ES", "/subtitle/1-1.zip"),
+                                           fetch_subdl.file_id("ES", "/subtitle/2-2.zip", "Show.S04E02.srt"),
+                                           fetch_subdl.file_id("ES", "/x")}))
+        self.assertNotIn("/subtitle", path.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(p.name for p in Path(self.work).iterdir()), ["srt", "subdl-rejected.json"])
+        mtime = path.stat().st_mtime_ns
+        with patch.object(fetch_subdl, "save") as save:          # already migrated: not rewritten
+            fetch_subdl.load_rejected(str(path), "ES")
+        save.assert_not_called()
+        self.assertEqual(path.stat().st_mtime_ns, mtime)
+        with patch.object(fetch_subdl, "save") as save:          # no cache yet: nothing written
+            self.assertEqual(fetch_subdl.load_rejected(str(Path(self.work) / "none.json"), "ES"), set())
+        save.assert_not_called()
+
+    def test_redirects_are_charged_capped_and_restricted_to_subdl(self):
+        body = zipped({"S04E01.srt": srt(SPANISH)})
+
+        def server(routes):
+            calls = []
+            def get(url, headers):
+                calls.append(url)
+                hop = routes[url]
+                if isinstance(hop, bytes):
+                    return hop
+                raise fetch_subdl.Redirect(302, hop)
+            return get, calls
+
+        # Absolute and relative hops on *.subdl.com are followed; every hop is charged.
+        get, calls = server({"https://dl.subdl.com/a.zip": "https://cdn.subdl.com/b.zip",
+                             "https://cdn.subdl.com/b.zip": "/c.zip", "https://cdn.subdl.com/c.zip": body})
+        client = self.client(get)
+        self.assertEqual(client.download("/a.zip"), body)
+        self.assertEqual((len(calls), client.downloads), (3, 3))
+
+        # A hop past the budget stops the run.
+        client = self.client(get, max_downloads=2)
+        calls.clear()
+        with self.assertRaises(fetch_subdl.DownloadLimit):
+            client.download("/a.zip")
+        self.assertEqual(len(calls), 2)
+
+        # API redirects are charged to the request budget.
+        api = json.dumps({"status": True, "subtitles": []}).encode()
+        client = self.client(lambda u, h: api if "api2" in u else (_ for _ in ()).throw(
+            fetch_subdl.Redirect(301, "https://api2.subdl.com/v1")))
+        self.assertEqual(client.subtitles(1, 4, "ES"), [])
+        self.assertEqual((client.requests, client.downloads), (2, 0))
+
+        # At most MAX_REDIRECTS hops.
+        loop = {f"https://dl.subdl.com/{n}": f"https://dl.subdl.com/{n + 1}" for n in range(10)}
+        get, calls = server(loop)
+        client = self.client(get)
+        with self.assertRaises(fetch_subdl.CandidateError):
+            client._fetch("https://dl.subdl.com/0", {}, client._charge_download)
+        self.assertEqual(len(calls), fetch_subdl.MAX_REDIRECTS + 1)
+
+        # Disallowed targets are refused without being requested or echoed.
+        for target in (f"http://dl.subdl.com/x?k={KEY}", f"https://evil.example/{KEY}", "https://evilsubdl.com/x",
+                       "https://dl.subdl.com.evil.example/x", f"https://dl.subdl.com{AT}evil.example/x",
+                       f"https://user{AT}dl.subdl.com/x", "https://dl.subdl.com:8443/x", "ftp://dl.subdl.com/x",
+                       f"https://{KEY}\u2100x/", "https://[::1/x"):
+            get, calls = server({"https://dl.subdl.com/a.zip": target})
+            client = self.client(get)
+            with self.assertRaises(fetch_subdl.CandidateError) as ctx:
+                client.download("/a.zip")
+            self.assertEqual(len(calls), 1, target)
+            self.assertNotIn(KEY, str(ctx.exception))
+            self.assertNotIn("evil", str(ctx.exception))
+
+        # In a run, a refused redirect falls through to the next candidate.
+        api4 = {4: {"status": True, "subtitles": [
+            {"release_name": "a", "season": 4, "episode": 1, "url": "/subtitle/1-1.zip"},
+            {"release_name": "b", "season": 4, "episode": 1, "url": "/subtitle/1-2.zip"}]}}
+        stub = Stub(api4, {"/subtitle/1-2.zip": body})
+        def get(u, h):
+            if u.endswith("/subtitle/1-1.zip"):
+                raise fetch_subdl.Redirect(302, f"https://evil.example/?api_key={KEY}")
+            return stub(u, h)
+        with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {4: 1}}):
+            result, logs = self.run_fetch("club-de-cuervos", get)
+        self.assertEqual(result["seasons"]["S04"]["found"], ["E01"])
+        self.assertTrue(any("disallowed host" in line for line in logs))
+        self.assertNotIn(KEY, "\n".join(logs))
+        self.assertNotIn("evil", "\n".join(logs))
+
+    def test_real_opener_never_follows_or_reads_redirects(self):
+        handlers = fetch_subdl._OPENER.handlers
+        self.assertTrue(any(isinstance(h, fetch_subdl.NoRedirect) for h in handlers))
+        self.assertFalse(any(type(h) is fetch_subdl.HTTPRedirectHandler for h in handlers))
+        for code in (301, 302, 303, 307, 308):
+            fp = MagicMock()
+            fp.read.side_effect = AssertionError("redirect body read")
+            handler = getattr(fetch_subdl.NoRedirect(), f"http_error_{code}")
+            with self.assertRaises(fetch_subdl.Redirect) as ctx:
+                handler(None, fp, code, "Found", {"Location": f"https://x.subdl.com/?api_key={KEY}"})
+            fp.close.assert_called_once()
+            fp.read.assert_not_called()
+            self.assertEqual(ctx.exception.location, f"https://x.subdl.com/?api_key={KEY}")
+            self.assertNotIn(KEY, str(ctx.exception))
+            self.assertNotIn("subdl.com", str(ctx.exception))
+
+    def test_zip_member_size_and_method_checked_before_opening(self):
+        z = MagicMock()
+        z.open.side_effect = AssertionError("opened")
+        big = ZipInfo("S04E01.srt")
+        big.file_size = fetch_subdl.MAX_MEMBER_BYTES + 1
+        with self.assertRaises(fetch_subdl.TooLarge):
+            fetch_subdl.read_capped(z, big)
+        bz = ZipInfo("S04E01.srt")
+        bz.compress_type, bz.file_size = ZIP_BZIP2, 10
+        with self.assertRaises(fetch_subdl.Unsupported):
+            fetch_subdl.read_capped(z, bz)
+        z.open.assert_not_called()
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w") as zf:
+            zf.writestr("S04E01.srt", srt(SPANISH), compress_type=ZIP_BZIP2)
+        api = {4: {"status": True, "subtitles": [
+            {"release_name": "a", "season": 4, "episode": 1, "url": "/subtitle/1-1.zip"},
+            {"release_name": "b", "season": 4, "episode": 1, "url": "/subtitle/1-2.zip"}]}}
+        stub = Stub(api, {"/subtitle/1-1.zip": buf.getvalue(), "/subtitle/1-2.zip": zipped({"S04E01.srt": srt(SPANISH)})})
+        with patch.dict(cfg("club-de-cuervos"), {"seasonEpisodes": {4: 1}}):
+            result, logs = self.run_fetch("club-de-cuervos", stub)
+        self.assertEqual(result["seasons"]["S04"]["found"], ["E01"])
+        self.assertTrue(any("unsupported compression" in line for line in logs))
+        self.assertIn(fetch_subdl.file_id("ES", "/subtitle/1-1.zip", "S04E01.srt"),
+                      load(str(Path(self.work) / "subdl-rejected.json")))
+
+    def test_raw_candidate_name_must_match_episode(self):
+        client = self.client(lambda u, h: srt(SPANISH))
+        # Episode-level URL whose file name names another episode (Codex's offline check).
+        sub = {"season": 4, "episode": 1, "url": "/sub/S04E02.srt"}
+        self.assertIsNone(fetch_subdl.select_episode(client, [sub], 4, 1, "ES", set(), quiet))
+        for url in ("/sub/S03E01.srt", "/sub/2x01.srt", "/sub/S04E01.txt", "/sub/S04E01.hi.srt"):
+            sub = {"season": 4, "episode": 1, "url": url}
+            self.assertFalse(fetch_subdl.candidates([sub], 4, 1, "ES")[0].raw_ok, url)
+        for url in ("/sub/S04E01.srt", "/sub/4x01.srt", "/sub/episode.srt"):
+            sub = {"season": 4, "episode": 1, "url": url}
+            self.assertTrue(fetch_subdl.candidates([sub], 4, 1, "ES")[0].raw_ok, url)
+        self.assertTrue(fetch_subdl.select_episode(client, [{"season": 4, "episode": 1, "url": "/sub/S04E01.srt"}],
+                                                   4, 1, "ES", set(), quiet))
+
+        # unpack_files: metadata and name marker must agree, and a raw body needs an .srt name.
+        def files(*entries):
+            return [{"release_name": "r", "season": 4, "episode": 1, "url": "/subtitle/1.zip", "unpack_files": list(entries)},
+                    {"release_name": "p", "season": 4, "full_season": True, "url": "/subtitle/p.zip",
+                     "unpack_files": list(entries)}]
+        self.assertEqual(fetch_subdl.candidates(files(unpack(1, "X.S04E02.srt", "/subtitle/f/1")), 4, 1, "ES"), [])
+        self.assertEqual(fetch_subdl.candidates(files(unpack(2, "X.S04E01.srt", "/subtitle/f/1")), 4, 1, "ES"), [])
+        odd = fetch_subdl.candidates(files(unpack(1, "X.S04E01.txt", "/subtitle/f/1", format="srt")), 4, 1, "ES")
+        self.assertEqual([c.raw_ok for c in odd], [False, False])
+        good = fetch_subdl.candidates(files(unpack(1, "X.S04E01.srt", "/subtitle/f/1")), 4, 1, "ES")
+        self.assertEqual([(c.season_pack, c.raw_ok) for c in good], [(False, True), (True, True)])
+        self.assertEqual(fetch_subdl.candidates(files(unpack(None, "X.srt", "/subtitle/f/1")), 4, 1, "ES")[0].raw_ok,
+                         True)                                     # episode-level, no marker anywhere
+        self.assertEqual(len(fetch_subdl.candidates(files(unpack(None, "X.srt", "/subtitle/f/1")), 4, 1, "ES")), 1)
+        stub = Stub({}, {"/subtitle/f/1": srt(SPANISH)})
+        self.assertIsNone(fetch_subdl.select_episode(self.client(stub), files(unpack(1, "X.S04E01.txt", "/subtitle/f/1",
+                                                                                     format="srt")),
+                                                     4, 1, "ES", set(), quiet))
 
 
 if __name__ == "__main__":

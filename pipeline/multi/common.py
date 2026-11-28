@@ -149,6 +149,14 @@ def episodes(show_id, work):
             os.path.basename(path).split(".")[0]
             for path in glob.glob(os.path.join(srt_dir, f"S??E??.{target}.srt"))
         })
+        # A configured seasonEpisodes {season: count} is authoritative here too: SRTs left over from older
+        # fetches (other seasons, E13 of a 12-episode season) must not shift the public numbering.
+        counts = {int(k): int(v) for k, v in (c.get("seasonEpisodes") or {}).items()}
+        if counts:
+            def in_range(code):
+                m = re.fullmatch(r"S(\d+)E(\d+)", code)
+                return bool(m) and 1 <= int(m[2]) <= counts.get(int(m[1]), 0)
+            codes = [code for code in codes if in_range(code)]
         for code in codes:
             srt = os.path.join(srt_dir, f"{code}.{target}.srt")
             if os.path.isfile(srt):
