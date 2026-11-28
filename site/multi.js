@@ -164,11 +164,12 @@ async function viewShow(show) {
   const stages = LONG_OUTLINES[show.language] || [];
   const next = stages.filter((s) => s.status === "planned").map((s) => uiLang() === "vi" ? s.showVi || s.show : s.show).join(" → ");
   const techStage = show.id === "silicon-valley" && stages.find((s) => s.showId === show.id);
+  const subtitle = [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · ");
   return [
     h("section", { class: "hero reveal" },
       h("p", { class: "eyebrow" }, [channelName(show), show.year].filter(Boolean).join(" · ")),
       titleEl(showTitle(show)),
-      h("p", { class: "lede" }, [show.titleEn, uiLang() === "vi" ? show.titleVi : show.titleZh].filter((x) => x && x !== show.titleNative).join(" · ")),
+      subtitle ? h("p", { class: "lede" }, subtitle) : null,
       techStage ? h("p", {}, pick(techStage.goal)) : null),
     h("div", { class: "track-grid" },
       h("a", { class: "track-card reveal", href: go(show, { page: "track", track: "short" }), "data-tilt": "1" },
